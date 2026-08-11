@@ -1,0 +1,50 @@
+<policies>
+  <inbound>
+    <base />
+    <cors allow-credentials="true">
+      <allowed-origins>
+        <origin>@(context.Request.Headers.GetValueOrDefault("Origin") ?? $"https://{context.Request.Url.Host}")</origin>
+      </allowed-origins>
+      <allowed-methods>
+        <method>*</method>
+      </allowed-methods>
+      <allowed-headers>
+        <header>*</header>
+      </allowed-headers>
+      <expose-headers>
+        <header>*</header>
+      </expose-headers>
+    </cors>
+    <rate-limit-by-key
+      calls="{{foundry-tool-calls-per-period}}"
+      renewal-period="{{foundry-tool-call-renewal-period-seconds}}"
+      counter-key="@(context.Subscription != null ? context.Subscription.Id : context.Request.IpAddress)"
+      retry-after-header-name="Retry-After"
+      remaining-calls-header-name="x-tool-calls-remaining" />
+    <llm-content-safety backend-id="foundry-content-safety" shield-prompt="true">
+      <categories output-type="EightSeverityLevels">
+        <category name="Hate" threshold="4" />
+        <category name="SelfHarm" threshold="4" />
+        <category name="Sexual" threshold="4" />
+        <category name="Violence" threshold="4" />
+      </categories>
+    </llm-content-safety>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+    <llm-content-safety backend-id="foundry-content-safety">
+      <categories output-type="EightSeverityLevels">
+        <category name="Hate" threshold="4" />
+        <category name="SelfHarm" threshold="4" />
+        <category name="Sexual" threshold="4" />
+        <category name="Violence" threshold="4" />
+      </categories>
+    </llm-content-safety>
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
