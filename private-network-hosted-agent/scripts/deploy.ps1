@@ -361,7 +361,9 @@ if ($ConnectivityMode -eq 'pointToSite') {
             Write-Host "[ACTION] Confirm the Azure Public Cloud ACR Private DNS zone 'privatelink.azurecr.io' is linked to this Foundry solution VNet."
             Write-Host "[ACTION] Confirm this VNet can reach the selected registry's Private Endpoint directly or through approved routing/peering."
             Write-Host '[ACTION] Use this Foundry VPN profile for validation; an ACR-side VPN profile does not validate the deployment path.'
-            Write-Host '[INFO] ACR IAM is completed after the initial Agent deployment creates its stable identity; an initial ImageError can be expected.'
+            Write-Host '[INFO] This workflow has separate network and IAM handoffs.'
+            Write-Host '[INFO] After network validation, the initial Agent deployment creates its stable identity.'
+            Write-Host '[INFO] A registry-authentication ImageError is expected until the later IAM handoff is complete; do not grant a guessed Agent identity.'
         }
         Read-Host 'Press Enter only after Azure VPN Client shows Connected' | Out-Null
     }
@@ -397,16 +399,41 @@ if ($DeploymentMode -eq 'ExistingPrivateAcr') {
     }
 }
 if ($DeploymentMode -eq 'Source' -or $null -eq $agent) {
-    $firstDeploy = Invoke-CheckedCommand `
-        -Stage 'Deploy Hosted Agent' `
-        -FilePath 'azd' `
-        -Arguments @(
-            'deploy', $serviceName, '-e', $EnvironmentName, '--no-prompt'
-        ) `
-        -WorkingDirectory $projectDirectory `
-        -AllowFailure
+    $deployArguments = @(
+        'deploy', $serviceName, '-e', $EnvironmentName, '--no-prompt'
+    )
+    if ($DeploymentMode -eq 'ExistingPrivateAcr') {
+        Write-Host '[INFO] Initializing the Hosted Agent to create its stable identity.'
+        Write-Host '[INFO] Missing ACR pull authorization at this bootstrap stage will be handled as the IAM handoff, not as a completed deployment.'
+        $firstDeploy = Invoke-CheckedCommand `
+            -Stage 'Initialize Hosted Agent identity' `
+            -FilePath 'azd' `
+            -Arguments $deployArguments `
+            -WorkingDirectory $projectDirectory `
+            -AllowFailure `
+            -Quiet
+    }
+    else {
+        $firstDeploy = Invoke-CheckedCommand `
+            -Stage 'Deploy Hosted Agent' `
+            -FilePath 'azd' `
+            -Arguments $deployArguments `
+            -WorkingDirectory $projectDirectory `
+            -AllowFailure
+    }
     if ($DeploymentMode -eq 'Source' -and $firstDeploy.ExitCode -ne 0) {
         throw "Source Hosted Agent deployment failed. Command: $($firstDeploy.Command)"
+    }
+    $expectedBootstrapAuthorizationFailure =
+        $DeploymentMode -eq 'ExistingPrivateAcr' -and
+        (Test-ExpectedAcrBootstrapAuthorizationFailure `
+            -ExitCode $firstDeploy.ExitCode `
+            -Output $firstDeploy.Output)
+    if ($DeploymentMode -eq 'ExistingPrivateAcr' -and
+        $firstDeploy.ExitCode -ne 0 -and
+        -not $expectedBootstrapAuthorizationFailure) {
+        $firstDeploy.Output | ForEach-Object { Write-Host $_ }
+        throw "Initial Hosted Agent deployment failed before the expected ACR IAM handoff. Command: $($firstDeploy.Command)"
     }
     try {
         $agent = Get-AgentRecord `
@@ -415,7 +442,13 @@ if ($DeploymentMode -eq 'Source' -or $null -eq $agent) {
             -ServiceName $serviceName
     }
     catch {
+        if ($DeploymentMode -eq 'ExistingPrivateAcr') {
+            $firstDeploy.Output | ForEach-Object { Write-Host $_ }
+        }
         throw "Hosted Agent identity was not created. Initial deploy command: $($firstDeploy.Command)"
+    }
+    if ($expectedBootstrapAuthorizationFailure) {
+        Write-Host '[INFO] The expected ACR authorization boundary was reached and the stable Hosted Agent identity was created.'
     }
 }
 $agentPrincipalId = Get-AgentPrincipalId -Agent $agent
@@ -453,8 +486,20 @@ if ($DeploymentMode -eq 'ExistingPrivateAcr') {
         -FilePath 'pwsh' `
         -Arguments $acrValidationArguments `
         -WorkingDirectory $projectDirectory `
-        -AllowFailure
+        -AllowFailure `
+        -Quiet
     if ($acrValidation.ExitCode -ne 0) {
+        $missingPullAuthorization = Test-MissingAcrPullAuthorizationFailure `
+            -ExitCode $acrValidation.ExitCode `
+            -Output $acrValidation.Output
+        if (-not $missingPullAuthorization) {
+            $acrValidation.Output | ForEach-Object { Write-Host $_ }
+            throw 'External ACR validation failed before the expected IAM handoff.'
+        }
+        Write-Host '[ACTION] Existing private ACR IAM handoff required:'
+        $acrValidation.Output |
+            Where-Object { $_ -match '^\[ACTION\]' } |
+            ForEach-Object { Write-Host $_ }
         if ($NoPrompt) {
             throw "External ACR IAM handoff is incomplete for Foundry project principal '$projectPrincipalId' and Agent principal '$agentPrincipalId'. The script did not modify ACR IAM."
         }

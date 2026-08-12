@@ -25,6 +25,31 @@ function Get-AzdEnvironmentValues {
     return ConvertFrom-AzdEnvironmentOutput $result.Output
 }
 
+function Test-ExpectedAcrBootstrapAuthorizationFailure {
+    param(
+        [int]$ExitCode,
+        [string[]]$Output
+    )
+    if ($ExitCode -eq 0) {
+        return $false
+    }
+    $text = $Output -join "`n"
+    return $text -match '(?i)\[ImageError\]' -and
+        $text -match '(?i)Container registry authentication failed|AcrPull permissions on the target registry'
+}
+
+function Test-MissingAcrPullAuthorizationFailure {
+    param(
+        [int]$ExitCode,
+        [string[]]$Output
+    )
+    if ($ExitCode -eq 0) {
+        return $false
+    }
+    return ($Output -join "`n") -match
+        '(?i)Missing exact-scope ACR pull authorization for:'
+}
+
 function Get-ReusableAzdEnvironmentContext {
     param(
         [string]$ProjectDirectory,

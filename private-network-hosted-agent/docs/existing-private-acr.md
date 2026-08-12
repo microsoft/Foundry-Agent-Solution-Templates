@@ -64,7 +64,7 @@ actions:
 | Phase | Operator action | Continue only when |
 |---|---|---|
 | Network pause | Follow [Complete the external private network handoff](#complete-the-external-private-network-handoff). | Private DNS, routing, VPN, and the fail-closed network validation pass. |
-| Initial Agent deployment | Let the script create the stable Hosted Agent identity. An initial `ImageError` is expected before IAM is complete. | The script prints both stable identity principal IDs. |
+| Initial Agent deployment | Let the script create the stable Hosted Agent identity. The script classifies the expected registry-authentication `ImageError` as the transition to the IAM handoff rather than a completed deployment. | The script confirms the stable Agent identity was created. |
 | IAM pause | Follow [Create the Agent identity and complete the external RBAC handoff](#create-the-agent-identity-and-complete-the-external-rbac-handoff). | Both exact-scope pull assignments have propagated and the fail-closed ACR validation passes. |
 | Completion | Let the script retry deployment and run acceptance validation. | The exact Agent version is active and the final validation report passes. |
 
@@ -437,8 +437,9 @@ network access before the script reaches the IAM pause.
 The template binds the `ContainerRegistry` connection to the Foundry project
 identity. Foundry also creates a stable per-agent identity when the Agent is
 first created. The preferred deployment script performs that initial creation,
-accepts the expected pre-IAM `ImageError`, and prints the stable values needed
-by the ACR administrator:
+classifies only the expected registry-authentication `ImageError` as the IAM
+handoff, and prints the stable values needed by the ACR administrator. Other
+initial deployment failures remain fatal:
 
 - `AZURE_AI_PROJECT_IDENTITY_PRINCIPAL_ID`;
 - `AZURE_AI_AGENT_PRINCIPAL_ID`;

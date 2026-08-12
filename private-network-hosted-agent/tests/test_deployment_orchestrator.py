@@ -35,6 +35,60 @@ def run_deploy_contract(*arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+@pytest.mark.parametrize(
+    ("exit_code", "output", "expected"),
+    [
+        (
+            1,
+            "[ImageError] Container registry authentication failed. "
+            "Verify the workspace managed identity has AcrPull permissions "
+            "on the target registry.",
+            True,
+        ),
+        (1, "[ImageError] Unsupported image manifest.", False),
+        (1, "Network timeout while creating agent.", False),
+        (0, "", False),
+    ],
+)
+def test_expected_acr_bootstrap_failure_is_narrowly_classified(
+    exit_code: int, output: str, expected: bool
+) -> None:
+    escaped_output = output.replace("'", "''")
+    result = invoke_workflow_contract(
+        "$result = Test-ExpectedAcrBootstrapAuthorizationFailure "
+        f"-ExitCode {exit_code} -Output @('{escaped_output}'); "
+        "Write-Output $result"
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().lower() == str(expected).lower()
+
+
+@pytest.mark.parametrize(
+    ("exit_code", "output", "expected"),
+    [
+        (
+            1,
+            "Missing exact-scope ACR pull authorization for: "
+            "Foundry project, Hosted Agent.",
+            True,
+        ),
+        (1, "ACR private data endpoint resolved publicly.", False),
+        (0, "", False),
+    ],
+)
+def test_missing_acr_pull_authorization_is_narrowly_classified(
+    exit_code: int, output: str, expected: bool
+) -> None:
+    escaped_output = output.replace("'", "''")
+    result = invoke_workflow_contract(
+        "$result = Test-MissingAcrPullAuthorizationFailure "
+        f"-ExitCode {exit_code} -Output @('{escaped_output}'); "
+        "Write-Output $result"
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().lower() == str(expected).lower()
+
+
 def test_source_minimal_contract_generates_dedicated_group() -> None:
     result = run_deploy_contract(
         "-DeploymentMode",

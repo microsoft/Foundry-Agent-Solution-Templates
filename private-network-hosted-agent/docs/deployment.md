@@ -71,10 +71,13 @@ Confirm every prerequisite in
 
 The script validates but never changes the external ACR. Provisioning creates
 the Foundry project identity, and the first Agent creation establishes its
-stable managed identity. If pull authorization is missing, the script prints
-both exact principals, the role, registry scope, and repository. The ACR owner
-applies those assignments outside this template; rerun the same command after
-propagation.
+stable managed identity. The script announces this bootstrap before invoking
+the first deployment. If the expected registry-authentication `ImageError`
+occurs, it is classified as the IAM handoff rather than an unexpected workflow
+failure. The script then prints both exact principals, the role, registry scope,
+and repository. The ACR owner applies those assignments outside this template;
+the script revalidates after propagation and continues the deployment. Other
+initial deployment failures remain fatal.
 
 At the network pause, follow the complete Portal or CLI checklist in
 [Complete the external private network handoff](existing-private-acr.md#complete-the-external-private-network-handoff).

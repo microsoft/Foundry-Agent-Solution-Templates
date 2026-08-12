@@ -12,7 +12,16 @@ delegated Agent subnet. Private endpoint NICs, Firewall, routes, VPN Gateway,
 and DNS Resolver are deployed in the template-owned VNet. Foundry, Search, and
 Key Vault remain service-managed Azure PaaS resources, with public access
 disabled and private data-plane access exposed into the VNet through private
-endpoints.
+endpoints. Foundry and Search also have local/key authentication disabled.
+
+The Hosted Agent endpoint uses a public-form
+`<account>.services.ai.azure.com` URL, but this template disables public network
+access on the Foundry account. An approved caller connected through VPN or
+peering resolves that hostname through `privatelink.services.ai.azure.com` to
+the account Private Endpoint. A caller outside the private path reaches the
+public listener but receives HTTP 403. After private endpoint and Entra
+authorization checks, the Microsoft-managed platform routes the invocation to
+the Agent runtime in the delegated subnet.
 
 The optional ACR path adds an external, enterprise-owned PaaS dependency. The
 template creates only the Foundry project connection; it does not own the
@@ -29,13 +38,18 @@ The PaaS services themselves aren't moved into the VNet.
 
 ## Foundry-to-model invocation path
 
-The diagram places the model deployment **inside the service-managed Foundry
-account boundary**, not inside the customer VNet. The project and model
-deployment are separate children of the same Foundry account. The Hosted Agent
-calls the model by using the project endpoint. For this template, both access to
-the Foundry resource/account endpoint and access to its project endpoint use the
-same **account-scoped Private Endpoint** and linked Private DNS zones. They are
-not separate Private Link resources.
+The diagram intentionally uses a logical service view rather than reproducing
+the full ARM and platform hierarchy. One **Foundry Agent Service** node combines
+the underlying account/project endpoints, Agent version and connections, and
+Microsoft-managed Hosted Agent orchestration. Account-level controls such as
+public-network and local-auth disablement, the account Private Endpoint target,
+and CMK are recorded on the surrounding logical Foundry boundary. The
+account-scoped model deployment remains separate so model invocation is visible.
+
+The Hosted Agent calls the model by using the project endpoint. For this
+template, both access to the Foundry resource/account endpoint and access to its
+project endpoint use the same **account-scoped Private Endpoint** and linked
+Private DNS zones. They are not separate Private Link resources.
 
 The following evidence distinguishes Microsoft-documented platform behavior
 from this template's implementation:
@@ -55,6 +69,62 @@ the specific path shown here:
 `Hosted Agent runtime -> project endpoint hostname -> Foundry account Private
 Endpoint -> Foundry project -> Microsoft-managed inference routing ->
 account-scoped model deployment`.
+
+The diagram numbers the two directions of one logical request after VPN or
+peering connectivity and private DNS are already available:
+
+| Step | Direction | Logical action |
+|---|---|---|
+| 1 | User invocation | The approved caller sends Agent HTTPS traffic; private DNS resolves the Foundry hostname to the account Private Endpoint. |
+| 2 | User invocation | Account Private Link carries the request to the project-scoped Agent endpoint. |
+| 3 | User invocation | Foundry provisions or selects runtime capacity and routes `/invoke` from the Agent endpoint to the Hosted Agent runtime in the delegated subnet. |
+| 4 | Runtime model call | The runtime calls the Foundry project endpoint over HTTPS; private DNS resolves the same account Private Endpoint. |
+| 5 | Runtime model call | Account Private Link carries the model request to the Foundry project. |
+| 6 | Runtime model call | Foundry performs Microsoft-managed inference routing to the account-scoped model deployment. |
+
+These are logical application-flow steps, not a claim about undocumented
+service-internal packet hops. Search access remains a separate workload branch
+from the Agent runtime through the Search Private Endpoint.
+
+### Key Vault paths
+
+Key Vault is intentionally outside the numbered Agent request flow. Approved
+administrators can reach its data plane through VPN or peering, private DNS, and
+the Key Vault Private Endpoint. This path supports private key, secret, and
+certificate operations; the current Agent runtime does not use it.
+
+Foundry and Search CMK operations follow separate dashed paths directly to Key
+Vault. These service-managed wrap, unwrap, and key-metadata operations use the
+Key Vault `AzureServices` trusted-services bypass and the respective managed
+identities. They do not traverse the Agent subnet, Key Vault Private Endpoint,
+or solution Firewall. ARM/Bicep deployment is also a management-plane path and
+does not require the deployment workstation to reach the Key Vault Private
+Endpoint.
+
+### Existing private ACR path
+
+The optional ACR and its Private Endpoint, private DNS, networking, and IAM are
+enterprise-owned external dependencies. The template does not deploy them into
+the solution VNet. The diagram therefore places them in a separate dashed
+boundary rather than inside the template-owned network.
+
+For this scenario, the template VNet and the enterprise VNet containing the ACR
+Private Endpoint require bidirectional peering with nonoverlapping address
+spaces. The enterprise DNS handoff must also make the registry login and
+regional data endpoint names resolve through `privatelink.azurecr.io` from the
+template VNet. This customer-managed ACR peering is separate from the selected
+P2S, S2S, or caller-VNet peering connectivity mode, and the template does not
+create it.
+
+The Foundry Agent Service node includes the project connection that selects the
+existing registry. The single orange edge represents the Microsoft-managed
+platform's deployment-time private image pull. ACR private DNS resolves the
+registry login and regional data endpoints to the enterprise ACR Private
+Endpoint, and the platform downloads the digest-pinned manifest and layers over
+Private Link. Both the Foundry project identity and stable per-Agent identity
+require the registry's exact pull role. This authorization requirement is a
+property of the ACR node rather than two additional network flows. Agent runtime
+requests do not traverse this path.
 
 This conclusion is specific to this template's endpoint usage, Private DNS
 links, disabled public network access, and account Private Endpoint. Microsoft
@@ -190,11 +260,11 @@ Search, or Key Vault data.
 The following application data-plane traffic resolves to RFC1918 addresses and
 uses Private Link rather than the public Firewall allowlist:
 
-- Agent and approved caller access to the Foundry project endpoint, including
-  this template's model-inference calls described in
+- Approved caller access to the Foundry account/project and Hosted Agent
+  endpoints, including Agent invocation, source upload, and version management
+- Agent access to the project endpoint for this template's model-inference calls
+  described in
   [Foundry-to-model invocation path](#foundry-to-model-invocation-path)
-- Agent source upload, version management, and invocation through the private
-  Foundry project endpoint
 - Agent access to Azure AI Search
 - Foundry image pull from the optional enterprise ACR
 
