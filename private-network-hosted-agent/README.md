@@ -25,9 +25,12 @@ customer-managed keys.
 - Provide a secure starting point for a customer design without weakening
   controls when a dependency fails.
 
-The sample intentionally does not implement customer data ingestion,
-document-level authorization, centralized monitoring, backup/DR, multiregion
-failover, a web UI, or a production support SLA.
+## What this template is not for
+
+It is not a production-ready, air-gapped, or multitenant application, and it
+does not provide customer data ingestion, document-level authorization,
+centralized monitoring, backup/DR, multiregion failover, a web UI, or a
+production support SLA.
 
 See [Solution overview](docs/solution-overview.md) for audience, use cases, and
 the complete support boundary.
