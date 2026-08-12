@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Private Hosted Agent deployment parameters",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "environmentName",
+    "deploymentPrincipalObjectId"
+  ],
+  "properties": {
+    "environmentName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 32,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{1,30}[a-z0-9])$"
+    },
+    "location": {
+      "type": "string",
+      "minLength": 1,
+      "default": "westus3"
+    },
+    "searchLocation": {
+      "type": "string",
+      "minLength": 1,
+      "default": "westus3"
+    },
+    "deploymentPrincipalObjectId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "invocationTestPrincipalObjectId": {
+      "type": "string",
+      "pattern": "^$|^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+      "default": ""
+    },
+    "connectivityMode": {
+      "type": "string",
+      "enum": [
+        "pointToSite",
+        "siteToSite",
+        "vnetPeering"
+      ],
+      "default": "pointToSite"
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "default": "10.42.0.0/16"
+    },
+    "agentSubnetPrefix": {
+      "type": "string",
+      "default": "10.42.0.0/24"
+    },
+    "privateEndpointSubnetPrefix": {
+      "type": "string",
+      "default": "10.42.1.0/24"
+    },
+    "firewallSubnetPrefix": {
+      "type": "string",
+      "default": "10.42.2.0/26"
+    },
+    "firewallCreationRequired": {
+      "type": "boolean",
+      "default": true
+    },
+    "gatewaySubnetPrefix": {
+      "type": "string",
+      "default": "10.42.3.0/27"
+    },
+    "dnsInboundSubnetPrefix": {
+      "type": "string",
+      "default": "10.42.4.0/28"
+    },
+    "dnsInboundIpAddress": {
+      "type": "string",
+      "default": "10.42.4.4"
+    },
+    "p2sAddressPool": {
+      "type": "string",
+      "default": "172.20.0.0/24"
+    },
+    "p2sTenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "s2sGatewayIpAddress": {
+      "type": "string",
+      "default": ""
+    },
+    "s2sRemoteAddressPrefixes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "s2sEnableBgp": {
+      "type": "boolean",
+      "default": false
+    },
+    "s2sRemoteAsn": {
+      "type": "integer",
+      "default": 65010
+    },
+    "s2sBgpPeeringAddress": {
+      "type": "string",
+      "default": ""
+    },
+    "s2sSharedKey": {
+      "type": "string",
+      "default": ""
+    },
+    "remoteVnetResourceId": {
+      "type": "string",
+      "pattern": "^$|^/subscriptions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/resourceGroups/[^/]+/providers/Microsoft\\.Network/virtualNetworks/[^/]+$",
+      "default": ""
+    },
+    "modelName": {
+      "type": "string",
+      "enum": [
+        "gpt-5.1"
+      ],
+      "default": "gpt-5.1"
+    },
+    "modelVersion": {
+      "type": "string",
+      "enum": [
+        "2025-11-13"
+      ],
+      "default": "2025-11-13"
+    },
+    "modelCapacity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 300,
+      "default": 10
+    },
+    "containerRegistryResourceId": {
+      "type": "string",
+      "pattern": "^$|^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\\.ContainerRegistry/registries/[^/]+$",
+      "default": ""
+    },
+    "containerRegistryEndpoint": {
+      "type": "string",
+      "pattern": "^$|^[a-z0-9-]+\\.azurecr\\.io$",
+      "default": ""
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "connectivityMode"
+        ],
+        "properties": {
+          "connectivityMode": {
+            "const": "vnetPeering"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "remoteVnetResourceId"
+        ],
+        "properties": {
+          "remoteVnetResourceId": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}

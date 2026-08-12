@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Private Hosted Agent deployment outputs",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "AZURE_RESOURCE_GROUP",
+    "AZURE_LOCATION",
+    "AZURE_SEARCH_LOCATION",
+    "RESOURCE_PREFIX",
+    "CONNECTIVITY_MODE",
+    "AZURE_VNET_ID",
+    "AZURE_FIREWALL_ID",
+    "AZURE_DNS_RESOLVER_INBOUND_IP",
+    "AZURE_VPN_GATEWAY_NAME",
+    "AZURE_AI_ACCOUNT_NAME",
+    "AZURE_AI_ACCOUNT_ID",
+    "AZURE_AI_ACCOUNT_IDENTITY_PRINCIPAL_ID",
+    "AZURE_AI_PROJECT_NAME",
+    "AZURE_AI_PROJECT_ID",
+    "AZURE_AI_PROJECT_IDENTITY_PRINCIPAL_ID",
+    "FOUNDRY_PROJECT_ENDPOINT",
+    "AZURE_AI_PROJECT_ENDPOINT",
+    "AZURE_AI_MODEL_DEPLOYMENT_NAME",
+    "AZURE_SEARCH_SERVICE_NAME",
+    "AZURE_SEARCH_SERVICE_ID",
+    "AZURE_SEARCH_ENDPOINT",
+    "AZURE_SEARCH_INDEX_NAME",
+    "AZURE_SEARCH_IDENTITY_PRINCIPAL_ID",
+    "AZURE_KEY_VAULT_NAME",
+    "AZURE_KEY_VAULT_ID",
+    "AZURE_KEY_VAULT_URI",
+    "AZURE_FOUNDRY_CMK_KEY_NAME",
+    "AZURE_FOUNDRY_CMK_KEY_VERSION",
+    "AZURE_FOUNDRY_CMK_KEY_ID",
+    "AZURE_FOUNDRY_CMK_IDENTITY_PRINCIPAL_ID",
+    "AZURE_SEARCH_CMK_KEY_NAME",
+    "AZURE_SEARCH_CMK_KEY_VERSION",
+    "AZURE_SEARCH_CMK_KEY_ID",
+    "DEPLOYMENT_PRINCIPAL_OBJECT_ID",
+    "RBAC_FOUNDRY_CMK_IDENTITY_ROLE_ID",
+    "RBAC_SEARCH_CMK_IDENTITY_ROLE_ID",
+    "RBAC_FOUNDRY_ACCOUNT_VAULT_ROLE_ID",
+    "RBAC_FOUNDRY_PROJECT_VAULT_ROLE_ID",
+    "RBAC_FOUNDRY_PROJECT_ACCOUNT_ROLE_ID",
+    "AZURE_CONTAINER_REGISTRY_RESOURCE_ID",
+    "AZURE_CONTAINER_REGISTRY_ENDPOINT",
+    "AZURE_CONTAINER_REGISTRY_CONNECTION_NAME",
+    "AZURE_AI_PROJECT_ACR_CONNECTION_NAME"
+  ],
+  "properties": {
+    "AZURE_RESOURCE_GROUP": {
+      "type": "string"
+    },
+    "AZURE_LOCATION": {
+      "type": "string"
+    },
+    "AZURE_SEARCH_LOCATION": {
+      "type": "string"
+    },
+    "RESOURCE_PREFIX": {
+      "type": "string"
+    },
+    "CONNECTIVITY_MODE": {
+      "type": "string",
+      "enum": [
+        "pointToSite",
+        "siteToSite",
+        "vnetPeering"
+      ]
+    },
+    "AZURE_VNET_ID": {
+      "type": "string"
+    },
+    "AZURE_FIREWALL_ID": {
+      "type": "string"
+    },
+    "AZURE_DNS_RESOLVER_INBOUND_IP": {
+      "type": "string"
+    },
+    "AZURE_VPN_GATEWAY_NAME": {
+      "type": "string"
+    },
+    "AZURE_AI_ACCOUNT_NAME": {
+      "type": "string"
+    },
+    "AZURE_AI_ACCOUNT_ID": {
+      "type": "string"
+    },
+    "AZURE_AI_ACCOUNT_IDENTITY_PRINCIPAL_ID": {
+      "type": "string"
+    },
+    "AZURE_AI_PROJECT_NAME": {
+      "type": "string"
+    },
+    "AZURE_AI_PROJECT_ID": {
+      "type": "string"
+    },
+    "AZURE_AI_PROJECT_IDENTITY_PRINCIPAL_ID": {
+      "type": "string"
+    },
+    "FOUNDRY_PROJECT_ENDPOINT": {
+      "type": "string",
+      "format": "uri"
+    },
+    "AZURE_AI_PROJECT_ENDPOINT": {
+      "type": "string",
+      "format": "uri"
+    },
+    "AZURE_AI_MODEL_DEPLOYMENT_NAME": {
+      "type": "string"
+    },
+    "AZURE_SEARCH_SERVICE_NAME": {
+      "type": "string"
+    },
+    "AZURE_SEARCH_SERVICE_ID": {
+      "type": "string"
+    },
+    "AZURE_SEARCH_ENDPOINT": {
+      "type": "string",
+      "format": "uri"
+    },
+    "AZURE_SEARCH_INDEX_NAME": {
+      "type": "string"
+    },
+    "AZURE_SEARCH_IDENTITY_PRINCIPAL_ID": {
+      "type": "string"
+    },
+    "AZURE_KEY_VAULT_NAME": {
+      "type": "string"
+    },
+    "AZURE_KEY_VAULT_ID": {
+      "type": "string"
+    },
+    "AZURE_KEY_VAULT_URI": {
+      "type": "string",
+      "format": "uri"
+    },
+    "AZURE_FOUNDRY_CMK_KEY_NAME": {
+      "type": "string"
+    },
+    "AZURE_FOUNDRY_CMK_KEY_VERSION": {
+      "type": "string"
+    },
+    "AZURE_FOUNDRY_CMK_KEY_ID": {
+      "type": "string"
+    },
+    "AZURE_FOUNDRY_CMK_IDENTITY_PRINCIPAL_ID": {
+      "type": "string"
+    },
+    "AZURE_SEARCH_CMK_KEY_NAME": {
+      "type": "string"
+    },
+    "AZURE_SEARCH_CMK_KEY_VERSION": {
+      "type": "string"
+    },
+    "AZURE_SEARCH_CMK_KEY_ID": {
+      "type": "string"
+    },
+    "DEPLOYMENT_PRINCIPAL_OBJECT_ID": {
+      "type": "string"
+    },
+    "RBAC_FOUNDRY_CMK_IDENTITY_ROLE_ID": {
+      "type": "string"
+    },
+    "RBAC_SEARCH_CMK_IDENTITY_ROLE_ID": {
+      "type": "string"
+    },
+    "RBAC_FOUNDRY_ACCOUNT_VAULT_ROLE_ID": {
+      "type": "string"
+    },
+    "RBAC_FOUNDRY_PROJECT_VAULT_ROLE_ID": {
+      "type": "string"
+    },
+    "RBAC_FOUNDRY_PROJECT_ACCOUNT_ROLE_ID": {
+      "type": "string"
+    },
+    "AZURE_CONTAINER_REGISTRY_RESOURCE_ID": {
+      "type": "string"
+    },
+    "AZURE_CONTAINER_REGISTRY_ENDPOINT": {
+      "type": "string"
+    },
+    "AZURE_CONTAINER_REGISTRY_CONNECTION_NAME": {
+      "type": "string"
+    },
+    "AZURE_AI_PROJECT_ACR_CONNECTION_NAME": {
+      "type": "string"
+    }
+  }
+}

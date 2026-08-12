@@ -1,0 +1,5 @@
+azure-ai-agentserver-responses==1.0.0b8
+azure-ai-projects==2.0.1
+azure-identity==1.25.3
+azure-search-documents==11.6.0
+httpx==0.28.1

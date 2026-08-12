@@ -1,0 +1,20 @@
+[
+  {
+    "id": "network-baseline",
+    "title": "Network baseline",
+    "content": "The private Hosted Agent template has no public fallback topology. Foundry, Search, and Key Vault public data-plane access is disabled.",
+    "source_url": "https://example.invalid/private-hosted-agent/network-baseline"
+  },
+  {
+    "id": "identity-baseline",
+    "title": "Identity baseline",
+    "content": "The Hosted Agent uses its dedicated runtime identity and has query-only Search Index Data Reader permission. It has no client secret.",
+    "source_url": "https://example.invalid/private-hosted-agent/identity-baseline"
+  },
+  {
+    "id": "cmk-baseline",
+    "title": "CMK baseline",
+    "content": "Foundry and the Search demo index use separate customer-managed keys named cmk-foundry and cmk-search in one protected Key Vault.",
+    "source_url": "https://example.invalid/private-hosted-agent/cmk-baseline"
+  }
+]

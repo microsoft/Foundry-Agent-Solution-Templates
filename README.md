@@ -1,3 +1,10 @@
-# Repository setup required :wave:
-    
-Please visit the website URL :point_right: for this repository to complete the setup of this repository and configure access controls.
+# Foundry Agent Solution Templates
+
+Reference solution templates for building and deploying Microsoft Foundry
+agents. Each template is self-contained in its own subfolder.
+
+## Solution templates
+
+| Template | Description |
+|---|---|
+| [Private-network Hosted Agent](private-network-hosted-agent/) | Demonstrates security and data-protection controls for a Hosted Agent solution, including VNet isolation, private endpoints, restricted egress, managed identity, and customer-managed keys. |
