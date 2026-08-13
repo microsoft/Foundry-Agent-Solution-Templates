@@ -4,7 +4,9 @@ requiredVersions:
     extensions:
         azure.ai.agents: '>=1.0.0-beta.7'
         azure.ai.projects: '>=1.0.0-beta.1'
-name: foundry-private-hosted-agent-existing-private-acr
+name: private-network-hosted-agent-existing-private-acr
+metadata:
+    template: private-network-hosted-agent@v1
 services:
     ai-project:
         host: azure.ai.project
