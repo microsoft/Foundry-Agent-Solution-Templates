@@ -1,0 +1,3 @@
+-r agent/search-agent/requirements.txt
+pytest==8.4.2
+
