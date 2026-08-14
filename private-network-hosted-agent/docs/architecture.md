@@ -1,9 +1,6 @@
 # Architecture
 
-![Private-network Hosted Agent architecture](diagrams/architecture.svg)
-
-The editable [Draw.io source](diagrams/architecture.drawio) is provided
-alongside the generated SVG.
+![Private-network Hosted Agent architecture](images/private-network-hosted-agent-architecture.png)
 
 The outer box is a **private data-plane security boundary**, not a statement
 that every Azure PaaS resource is physically deployed inside a customer subnet.

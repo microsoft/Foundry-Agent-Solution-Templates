@@ -37,7 +37,7 @@ the complete support boundary.
 
 ## Architecture
 
-![Private-network Hosted Agent architecture](docs/diagrams/architecture.svg)
+![Private-network Hosted Agent architecture](docs/images/private-network-hosted-agent-architecture.png)
 
 The solution deploys:
 

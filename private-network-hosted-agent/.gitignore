@@ -11,7 +11,6 @@ htmlcov/
 !.env.example
 artifacts/
 *.log
-.$*.drawio.bkp
 *.zip
 infra/main.json
 azurevpnconfig.xml
