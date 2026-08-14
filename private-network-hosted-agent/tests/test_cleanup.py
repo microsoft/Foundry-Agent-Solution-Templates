@@ -8,7 +8,7 @@ import pytest
 ROOT = Path(__file__).parents[1]
 CLEANUP = ROOT / "scripts" / "cleanup.ps1"
 ENVIRONMENT = "fpha-src-cleanup"
-SUBSCRIPTION = "1756abc0-3554-4341-8d6a-46674962ea19"
+SUBSCRIPTION = "11111111-1111-1111-1111-111111111111"
 RESOURCE_GROUP = f"rg-{ENVIRONMENT}"
 ACCOUNT = "aif-cleanup"
 PROJECT = "proj-cleanup"

@@ -315,7 +315,7 @@ def test_parameter_schema_matches_and_validates_public_entry_point() -> None:
     }
     valid_parameters.update(
         environmentName="fpha-contract",
-        deploymentPrincipalObjectId="1756abc0-3554-4341-8d6a-46674962ea19",
+        deploymentPrincipalObjectId="11111111-1111-1111-1111-111111111111",
         p2sTenantId="77777777-7777-7777-7777-777777777777",
     )
     assert schema_accepts(PARAMETER_SCHEMA, valid_parameters)
@@ -324,7 +324,7 @@ def test_parameter_schema_matches_and_validates_public_entry_point() -> None:
         dict(
             valid_parameters,
             containerRegistryResourceId=(
-                "/subscriptions/1756abc0-3554-4341-8d6a-46674962ea19/"
+                "/subscriptions/11111111-1111-1111-1111-111111111111/"
                 "resourceGroups/rg-enterprise/providers/"
                 "Microsoft.ContainerRegistry/registries/enterpriseacr"
             ),
@@ -344,7 +344,7 @@ def test_parameter_schema_matches_and_validates_public_entry_point() -> None:
         dict(
             valid_parameters,
             containerRegistryResourceId=(
-                "/subscriptions/1756abc0-3554-4341-8d6a-46674962ea19/"
+                "/subscriptions/11111111-1111-1111-1111-111111111111/"
                 "resourceGroups/rg-enterprise/providers/"
                 "Microsoft.ContainerRegistry/registries/enterpriseacr"
             ),
@@ -361,7 +361,7 @@ def test_parameter_schema_matches_and_validates_public_entry_point() -> None:
             valid_parameters,
             connectivityMode="vnetPeering",
             remoteVnetResourceId=(
-                "/subscriptions/1756abc0-3554-4341-8d6a-46674962ea19/"
+                "/subscriptions/11111111-1111-1111-1111-111111111111/"
                 "resourceGroups/rg-network/providers/Microsoft.Network/"
                 "virtualNetworks/remote-vnet/subnets/default"
             ),

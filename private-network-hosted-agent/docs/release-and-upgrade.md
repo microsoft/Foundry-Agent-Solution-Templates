@@ -4,7 +4,7 @@ This template does not publish a supported release train, upgrade SLA, or
 compatibility window. Deploy and hand off an exact tested commit rather than an
 unpinned branch.
 
-## Record every deployment
+## Recommended deployment records to retain
 
 Capture:
 
