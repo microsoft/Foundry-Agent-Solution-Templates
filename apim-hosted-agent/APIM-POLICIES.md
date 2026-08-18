@@ -1,7 +1,5 @@
 # APIM Policy Reference
 
-English | [简体中文](APIM-POLICIES-zh.md)
-
 This document describes every APIM policy XML file in `infra/policies`, where
 it is deployed, and how requests flow through it.
 
