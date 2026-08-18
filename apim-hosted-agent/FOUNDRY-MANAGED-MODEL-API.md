@@ -13,7 +13,9 @@ The model API requires an API Management Product subscription key:
 
 The key authenticates the caller to API Management. API Management then uses its
 managed identity to call the Foundry account with the
-`https://ai.azure.com/` audience. The API key is not a Foundry model key.
+`https://ai.azure.com/` audience. The API key is not a Foundry model key. Before
+provisioning, configure the API policy to remove the subscription key as
+described below so the APIM secret is not forwarded to Foundry.
 
 ## Retrieve the subscription key
 
@@ -89,6 +91,20 @@ call the Product subscription-key API instead.
 
 ### 1. Provision the subscription-key API
 
+API Management forwards subscription key headers and query parameters to the
+backend by default. Before provisioning, ensure the `<inbound>` section of
+`infra/policies/foundry-project-model-key-auth-policy.xml` removes both accepted
+key forms after `<base />`:
+
+```xml
+<set-header name="api-key" exists-action="delete" />
+<set-query-parameter name="subscription-key" exists-action="delete" />
+```
+
+APIM validates the subscription key before API policy execution, so deleting it
+here prevents the APIM secret from reaching the Foundry backend without
+disabling subscription authentication.
+
 Provision the infrastructure before retrieving the key. Provisioning creates
 the APIM Product and its Product-scoped subscription:
 
@@ -126,10 +142,14 @@ services:
               value: ${APIM_FOUNDRY_PROJECT_ENDPOINT}
             - name: AGENT_APIM_SUBSCRIPTION_KEY
               value: ${APIM_FOUNDRY_SUBSCRIPTION_KEY}
+            - name: AGENT_TOOLBOX_ENDPOINT
+              value: ${TOOLBOX_TOOLS_MCP_ENDPOINT}
 ```
 
 `APIM_FOUNDRY_PROJECT_ENDPOINT` targets the Product subscription-key API.
-Do not use `APIM_OAUTH_FOUNDRY_PROJECT_ENDPOINT` in this configuration.
+Do not use `APIM_OAUTH_FOUNDRY_PROJECT_ENDPOINT` in this configuration. Keep
+`AGENT_TOOLBOX_ENDPOINT`; `src/main.py` requires it when initializing the
+Foundry toolbox.
 
 ### 4. Add the `api-key` header to model requests
 
@@ -182,8 +202,9 @@ To restore the default architecture:
 1. Set `AGENT_APIM_PROJECT_ENDPOINT` back to
    `${APIM_OAUTH_FOUNDRY_PROJECT_ENDPOINT}`.
 2. Remove `AGENT_APIM_SUBSCRIPTION_KEY` from `azure.yaml`.
-3. Remove `default_headers={"api-key": api_key}` and the key-loading code from
-   `src/main.py`.
+3. Remove the key-loading code from `src/main.py` and restore
+   `default_headers={"User-Agent": "apim-hosted-agent-v1"}` on
+   `FoundryChatClient`.
 4. Deploy a new hosted-agent version with `azd deploy --no-prompt`.
 
 See [APIM Policy Reference](APIM-POLICIES.md) for the complete policy map.
