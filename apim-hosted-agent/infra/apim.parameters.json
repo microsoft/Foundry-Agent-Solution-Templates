@@ -1,0 +1,44 @@
+{
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "apimName": {
+      "value": "${APIM_NAME}"
+    },
+    "publisherEmail": {
+      "value": "${APIM_PUBLISHER_EMAIL}"
+    },
+    "publisherName": {
+      "value": "${APIM_PUBLISHER_NAME}"
+    },
+    "modelApiId": {
+      "value": "${AZURE_AI_ACCOUNT_NAME}"
+    },
+    "foundryProjectName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "modelDeploymentName": {
+      "value": "agent-model"
+    },
+    "modelUserTokenLimit": {
+      "value": 1000000
+    },
+    "modelUserTokenQuota": {
+      "value": 10000000
+    },
+    "modelUserTokenQuotaPeriod": {
+      "value": "Hourly"
+    },
+    "githubOAuthClientId": {
+      "value": "${GITHUB_OAUTH_CLIENT_ID}"
+    },
+    "githubOAuthClientSecret": {
+      "value": "${GITHUB_OAUTH_CLIENT_SECRET}"
+    },
+    "githubBlockedUserNames": {
+      "value": "${GITHUB_BLOCKED_USER_NAMES}"
+    },
+    "githubBlockedToolNames": {
+      "value": "${GITHUB_BLOCKED_TOOL_NAMES=}"
+    }
+  }
+}

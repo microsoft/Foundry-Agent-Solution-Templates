@@ -1,0 +1,36 @@
+<policies>
+  <inbound>
+    <base />
+    <cors allow-credentials="true">
+      <allowed-origins>
+        <origin>@(context.Request.Headers.GetValueOrDefault("Origin") ?? $"https://{context.Request.Url.Host}")</origin>
+      </allowed-origins>
+      <allowed-methods>
+        <method>*</method>
+      </allowed-methods>
+      <allowed-headers>
+        <header>*</header>
+      </allowed-headers>
+      <expose-headers>
+        <header>*</header>
+      </expose-headers>
+    </cors>
+    <rate-limit-by-key
+      calls="{{policy-tool-rate-limit-requests}}"
+      renewal-period="{{policy-tool-rate-limit-window-seconds}}"
+      counter-key="@(context.Subscription != null ? context.Subscription.Id : context.Request.IpAddress)"
+      retry-after-header-name="Retry-After"
+      remaining-calls-header-name="x-tool-calls-remaining" />
+    <include-fragment fragment-id="foundry-tool-content-safety" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+    <include-fragment fragment-id="foundry-tool-content-safety" />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

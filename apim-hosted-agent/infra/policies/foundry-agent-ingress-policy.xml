@@ -1,0 +1,53 @@
+<policies>
+  <inbound>
+    <base />
+    <rate-limit-by-key
+      calls="{{policy-agent-rate-limit-requests}}"
+      renewal-period="{{policy-agent-rate-limit-window-seconds}}"
+      counter-key="@(context.Request.IpAddress)"
+      retry-after-header-name="Retry-After"
+      remaining-calls-header-name="x-agent-calls-remaining" />
+    <validate-azure-ad-token
+      tenant-id="__TENANT_ID__"
+      header-name="Authorization"
+      failed-validation-httpcode="401"
+      failed-validation-error-message="A valid Microsoft Foundry access token is required."
+      output-token-variable-name="foundryToken">
+      <audiences>
+        <audience>https://ai.azure.com</audience>
+      </audiences>
+    </validate-azure-ad-token>
+    <set-variable name="endUserTenantId" value='@(((Jwt)context.Variables["foundryToken"]).Claims.GetValueOrDefault("tid", ""))' />
+    <set-variable name="endUserObjectId" value='@(((Jwt)context.Variables["foundryToken"]).Claims.GetValueOrDefault("oid", ""))' />
+    <choose>
+      <when condition='@(string.IsNullOrWhiteSpace((string)context.Variables["endUserTenantId"]) || string.IsNullOrWhiteSpace((string)context.Variables["endUserObjectId"]))'>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-body>A Microsoft Entra user identity is required.</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-header name="x-client-end-user-key" exists-action="override">
+      <value>@{
+        var identity = (string)context.Variables["endUserTenantId"] + ":" + (string)context.Variables["endUserObjectId"];
+        using (var sha256 = SHA256.Create())
+        {
+          var digest = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
+          return "platform/" + BitConverter.ToString(digest).Replace("-", "").ToLowerInvariant();
+        }
+      }</value>
+    </set-header>
+    <set-query-parameter name="api-version" exists-action="override">
+      <value>v1</value>
+    </set-query-parameter>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

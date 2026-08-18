@@ -1,0 +1,90 @@
+<policies>
+  <inbound>
+    <base />
+    <choose>
+      <when condition="@(!context.Request.Headers.ContainsKey(&quot;Authorization&quot;) || !context.Request.Headers.GetValueOrDefault(&quot;Authorization&quot;, &quot;&quot;).StartsWith(&quot;Bearer &quot;, StringComparison.OrdinalIgnoreCase))">
+        <return-response>
+          <set-status code="401" reason="Unauthorized" />
+          <set-header name="WWW-Authenticate" exists-action="override">
+            <value>Bearer error="invalid_token"</value>
+          </set-header>
+        </return-response>
+      </when>
+    </choose>
+    <send-request mode="new" response-variable-name="githubIdentity" timeout="20" ignore-error="true">
+      <set-url>https://api.github.com/user</set-url>
+      <set-method>GET</set-method>
+      <set-header name="Authorization" exists-action="override">
+        <value>@(context.Request.Headers.GetValueOrDefault("Authorization", ""))</value>
+      </set-header>
+      <set-header name="Accept" exists-action="override">
+        <value>application/vnd.github+json</value>
+      </set-header>
+      <set-header name="X-GitHub-Api-Version" exists-action="override">
+        <value>2022-11-28</value>
+      </set-header>
+      <set-header name="User-Agent" exists-action="override">
+        <value>apim-hosted-foundry-agent</value>
+      </set-header>
+    </send-request>
+    <choose>
+      <when condition="@(!context.Variables.ContainsKey(&quot;githubIdentity&quot;) || context.Variables[&quot;githubIdentity&quot;] == null || ((IResponse)context.Variables[&quot;githubIdentity&quot;]).StatusCode != 200)">
+        <return-response>
+          <set-status code="401" reason="Unauthorized" />
+          <set-header name="WWW-Authenticate" exists-action="override">
+            <value>Bearer error="invalid_token"</value>
+          </set-header>
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="githubUserName" value="@(((IResponse)context.Variables[&quot;githubIdentity&quot;]).Body.As&lt;Newtonsoft.Json.Linq.JObject&gt;(preserveContent: true)[&quot;login&quot;].ToString())" />
+    <choose>
+      <when condition="@(!string.IsNullOrWhiteSpace(&quot;{{policy-github-blocked-users}}&quot;) &amp;&amp; (&quot;,&quot; + &quot;{{policy-github-blocked-users}}&quot;.Replace(&quot; &quot;, &quot;&quot;).ToLowerInvariant() + &quot;,&quot;).Contains(&quot;,&quot; + ((string)context.Variables[&quot;githubUserName&quot;]).ToLowerInvariant() + &quot;,&quot;))">
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="githubMcpToolName" value="@(context.Request.Method.Equals(&quot;POST&quot;, StringComparison.OrdinalIgnoreCase) ? (string)(context.Request.Body.As&lt;Newtonsoft.Json.Linq.JObject&gt;(preserveContent: true).SelectToken(&quot;params.name&quot;) ?? &quot;&quot;) : &quot;&quot;)" />
+    <choose>
+      <when condition="@(!string.IsNullOrWhiteSpace((string)context.Variables[&quot;githubMcpToolName&quot;]) &amp;&amp; (&quot;,&quot; + &quot;{{policy-github-blocked-tools}}&quot;.Replace(&quot; &quot;, &quot;&quot;).ToLowerInvariant() + &quot;,&quot;).Contains(&quot;,&quot; + ((string)context.Variables[&quot;githubMcpToolName&quot;]).ToLowerInvariant() + &quot;,&quot;))">
+        <return-response>
+          <set-status code="403" reason="GitHub MCP tool blocked" />
+        </return-response>
+      </when>
+    </choose>
+    <choose>
+      <when condition="@(context.Request.Method.Equals(&quot;POST&quot;, StringComparison.OrdinalIgnoreCase) &amp;&amp; string.Equals((string)context.Request.Body.As&lt;Newtonsoft.Json.Linq.JObject&gt;(preserveContent: true)[&quot;method&quot;], &quot;tools/list&quot;, StringComparison.Ordinal) &amp;&amp; context.Request.Body.As&lt;Newtonsoft.Json.Linq.JObject&gt;(preserveContent: true)[&quot;params&quot;] == null)">
+        <set-body>@{
+          var body = context.Request.Body.As&lt;Newtonsoft.Json.Linq.JObject&gt;(preserveContent: true);
+          body[&quot;params&quot;] = new Newtonsoft.Json.Linq.JObject();
+          return body.ToString(Newtonsoft.Json.Formatting.None);
+        }</set-body>
+      </when>
+    </choose>
+    <set-variable name="githubUserId" value="@(((IResponse)context.Variables[&quot;githubIdentity&quot;]).Body.As&lt;Newtonsoft.Json.Linq.JObject&gt;(preserveContent: true)[&quot;id&quot;].ToString())" />
+    <rate-limit-by-key
+      calls="{{policy-tool-rate-limit-requests}}"
+      renewal-period="{{policy-tool-rate-limit-window-seconds}}"
+      counter-key="@(&quot;github-user:&quot; + (string)context.Variables[&quot;githubUserId&quot;])"
+      retry-after-header-name="Retry-After"
+      remaining-calls-header-name="x-github-mcp-calls-remaining" />
+    <set-header name="Accept" exists-action="override">
+      <value>application/json, text/event-stream</value>
+    </set-header>
+    <include-fragment fragment-id="foundry-tool-content-safety" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+    <set-header name="X-GitHub-MCP-Governed" exists-action="override">
+      <value>github-user-oauth</value>
+    </set-header>
+    <include-fragment fragment-id="foundry-tool-content-safety" />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

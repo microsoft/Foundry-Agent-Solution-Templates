@@ -1,0 +1,43 @@
+<policies>
+  <inbound>
+    <base />
+    <set-backend-service backend-id="__BACKEND_ID__" />
+    <choose>
+      <when condition='@(context.Variables.ContainsKey("tokenlimit-" + (string)context.Request.Foundry.Deployment) &amp;&amp; context.Variables.ContainsKey("tokenquota-" + (string)context.Request.Foundry.Deployment))'>
+        <set-variable name="deploymentName" value="@((string)context.Request.Foundry.Deployment)" />
+        <set-variable name="limitVariableName" value='@("tokenlimit-" + (string)context.Variables["deploymentName"])' />
+        <set-variable name="quotaVariableName" value='@("tokenquota-" + (string)context.Variables["deploymentName"])' />
+        <set-variable name="tokenLimitValue" value='@((string)context.Variables[(string)context.Variables["limitVariableName"]])' />
+        <set-variable name="tokenQuotaValue" value="@(((string)context.Variables[(string)context.Variables[&quot;quotaVariableName&quot;]]).Split('|')[0])" />
+        <set-variable name="tokenQuotaPeriod" value="@(((string)context.Variables[(string)context.Variables[&quot;quotaVariableName&quot;]]).Split('|')[1])" />
+        <set-variable name="counterKey" value='@("product/" + context.Product?.Id + "/deployment/" + (string)context.Variables["deploymentName"] + "/limit/" + (string)context.Variables["tokenLimitValue"] + "/quota/" + (string)context.Variables["tokenQuotaValue"] + "/period/" + (string)context.Variables["tokenQuotaPeriod"])' />
+        <choose>
+          <when condition='@(((string)context.Variables["tokenQuotaPeriod"]) == "Hourly")'>
+            <llm-token-limit counter-key='@((string)context.Variables["counterKey"])' tokens-per-minute='@(int.Parse((string)context.Variables["tokenLimitValue"]))' token-quota='@(long.Parse((string)context.Variables["tokenQuotaValue"]))' token-quota-period="Hourly" estimate-prompt-tokens="true" />
+          </when>
+          <when condition='@(((string)context.Variables["tokenQuotaPeriod"]) == "Daily")'>
+            <llm-token-limit counter-key='@((string)context.Variables["counterKey"])' tokens-per-minute='@(int.Parse((string)context.Variables["tokenLimitValue"]))' token-quota='@(long.Parse((string)context.Variables["tokenQuotaValue"]))' token-quota-period="Daily" estimate-prompt-tokens="true" />
+          </when>
+          <when condition='@(((string)context.Variables["tokenQuotaPeriod"]) == "Weekly")'>
+            <llm-token-limit counter-key='@((string)context.Variables["counterKey"])' tokens-per-minute='@(int.Parse((string)context.Variables["tokenLimitValue"]))' token-quota='@(long.Parse((string)context.Variables["tokenQuotaValue"]))' token-quota-period="Weekly" estimate-prompt-tokens="true" />
+          </when>
+          <when condition='@(((string)context.Variables["tokenQuotaPeriod"]) == "Monthly")'>
+            <llm-token-limit counter-key='@((string)context.Variables["counterKey"])' tokens-per-minute='@(int.Parse((string)context.Variables["tokenLimitValue"]))' token-quota='@(long.Parse((string)context.Variables["tokenQuotaValue"]))' token-quota-period="Monthly" estimate-prompt-tokens="true" />
+          </when>
+          <otherwise>
+            <llm-token-limit counter-key='@((string)context.Variables["counterKey"])' tokens-per-minute='@(int.Parse((string)context.Variables["tokenLimitValue"]))' token-quota='@(long.Parse((string)context.Variables["tokenQuotaValue"]))' token-quota-period="Yearly" estimate-prompt-tokens="true" />
+          </otherwise>
+        </choose>
+      </when>
+    </choose>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

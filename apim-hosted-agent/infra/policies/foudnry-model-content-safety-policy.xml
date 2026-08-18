@@ -1,0 +1,20 @@
+<policies>
+  <inbound>
+    <base />
+    <include-fragment fragment-id="foundry-model-user-level" />
+    <set-variable name="originalModelRequestBody" value="@((string)context.Request.Body.As&lt;string&gt;(preserveContent: true))" />
+    <set-body>@{
+      var body = JObject.Parse((string)context.Variables["originalModelRequestBody"]);
+      body.Remove("instructions");
+      body.Remove("tools");
+      return body.ToString();
+    }</set-body>
+    <llm-content-safety backend-id="foundry-content-safety" shield-prompt="{{policy-content-safety-prompt-shield-enabled}}" />
+    <set-body>@((string)context.Variables["originalModelRequestBody"])</set-body>
+  </inbound>
+  <backend><base /></backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error><base /></on-error>
+</policies>

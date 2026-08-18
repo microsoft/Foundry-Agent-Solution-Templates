@@ -1,0 +1,10 @@
+<fragment>
+  <llm-content-safety backend-id="foundry-content-safety" shield-prompt="{{policy-content-safety-prompt-shield-enabled}}">
+    <categories output-type="EightSeverityLevels">
+    <category name="Hate" threshold="{{policy-content-safety-hate-threshold}}" />
+    <category name="SelfHarm" threshold="{{policy-content-safety-self-harm-threshold}}" />
+    <category name="Sexual" threshold="{{policy-content-safety-sexual-threshold}}" />
+    <category name="Violence" threshold="{{policy-content-safety-violence-threshold}}" />
+    </categories>
+  </llm-content-safety>
+</fragment>
