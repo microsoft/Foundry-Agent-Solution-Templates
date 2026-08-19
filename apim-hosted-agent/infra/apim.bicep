@@ -29,26 +29,8 @@ param foundryProjectName string
 @description('Microsoft Foundry hosted agent exposed through the APIM ingress route.')
 param foundryAgentName string = 'agent'
 
-@description('Foundry model deployment name used by the project token policy.')
+@description('Foundry model deployment exposed through the model gateways.')
 param modelDeploymentName string
-
-@minValue(1)
-@description('Maximum prompt and completion tokens allowed per minute for the project deployment.')
-param modelTokenLimit int = 1000000
-
-@minValue(1)
-@description('Maximum prompt and completion tokens allowed in the project quota period.')
-param modelTokenQuota int = 10000000
-
-@allowed([
-  'Hourly'
-  'Daily'
-  'Weekly'
-  'Monthly'
-  'Yearly'
-])
-@description('Fixed period used by the project token quota.')
-param modelTokenQuotaPeriod string = 'Hourly'
 
 @minValue(1)
 @description('Maximum prompt and completion tokens allowed per minute for each end user.')
@@ -288,9 +270,6 @@ module model 'modules/apim-model.bicep' = {
     foundryAccountName: modelApiId
     foundryProjectName: foundryProjectName
     modelDeploymentName: modelDeploymentName
-    modelTokenLimit: modelTokenLimit
-    modelTokenQuota: modelTokenQuota
-    modelTokenQuotaPeriod: modelTokenQuotaPeriod
     tenantId: tenant().tenantId
   }
   dependsOn: [
@@ -332,8 +311,11 @@ output APIM_RESOURCE_ID string = apim.id
 output APIM_GATEWAY_URL string = 'https://${apim.name}.azure-api.net'
 output APIM_AGENT_GATEWAY_URL string = agent.outputs.gatewayUrl
 output APIM_FOUNDRY_PROJECT_ENDPOINT string = model.outputs.portalProjectEndpoint
-output APIM_OAUTH_API_ID string = model.outputs.oauthApiId
-output APIM_OAUTH_FOUNDRY_PROJECT_ENDPOINT string = model.outputs.oauthProjectEndpoint
+output APIM_FOUNDRY_ADMIN_CONNECTION_NAME string = model.outputs.adminConnectionName
+output APIM_FOUNDRY_ADMIN_CONNECTION_MODEL string = model.outputs.adminConnectionModel
+output APIM_FOUNDRY_ADMIN_MODEL_DEPLOYMENT_NAME string = model.outputs.adminModelDeploymentName
+output APIM_FOUNDRY_ADMIN_MODEL_API_URL string = model.outputs.adminModelApiUrl
+output APIM_FOUNDRY_DIRECT_PROJECT_ENDPOINT string = model.outputs.directProjectEndpoint
 output APIM_FOUNDRY_PRODUCT_NAME string = model.outputs.productName
 output APIM_FOUNDRY_SUBSCRIPTION_NAME string = model.outputs.productSubscriptionName
 output MCP_URL string = learnTool.outputs.gatewayUrl

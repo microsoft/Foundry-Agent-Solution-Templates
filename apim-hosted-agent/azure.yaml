@@ -16,13 +16,13 @@ services:
     project:
         host: azure.ai.project
         deployments:
-            - name: agent-model
+            - name: gpt-5.6-luna
               model:
                   format: OpenAI
-                  name: gpt-5-mini
-                  version: "2025-08-07"
+                  name: gpt-5.6-luna
+                  version: "2026-07-09"
               sku:
-                  capacity: 10
+                  capacity: 1
                   name: DataZoneStandard
     tools:
         host: azure.ai.toolbox
@@ -43,11 +43,9 @@ services:
             - tools
         environmentVariables:
             - name: AGENT_MODEL_DEPLOYMENT
-              value: agent-model
-            - {
-                  name: AGENT_APIM_PROJECT_ENDPOINT,
-                  value: "${APIM_OAUTH_FOUNDRY_PROJECT_ENDPOINT}",
-              }
+              value: ${APIM_FOUNDRY_ADMIN_MODEL_DEPLOYMENT_NAME}
+            - name: AGENT_APIM_PROJECT_ENDPOINT
+              value: ${APIM_FOUNDRY_DIRECT_PROJECT_ENDPOINT}
             - name: AGENT_TOOLBOX_ENDPOINT
               value: ${TOOLBOX_TOOLS_MCP_ENDPOINT}
         codeConfiguration:

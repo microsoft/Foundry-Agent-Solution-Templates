@@ -1,4 +1,4 @@
-"""Propagate a trusted end-user identity from hosted requests to model calls."""
+"""Propagate a trusted end-user identity to direct APIM model requests."""
 
 import asyncio
 import logging
@@ -15,9 +15,6 @@ DEFAULT_END_USER_IDENTITY = "default_user"
 logger = logging.getLogger(__name__)
 _END_USER_KEY_PATTERN = re.compile(r"^platform/[0-9a-f]{64}$")
 
-# The response stream can outlive the initial request handler call. A ContextVar
-# keeps the identity isolated across concurrent streams until each one finishes.
-
 _current_end_user_identity: ContextVar[str | None] = ContextVar(
     "current_end_user_identity",
     default=None,
@@ -25,7 +22,7 @@ _current_end_user_identity: ContextVar[str | None] = ContextVar(
 
 
 class EndUserIdentityForwardingMiddleware(ChatMiddleware):
-    """Add the current trusted end-user key to each model call."""
+    """Add the current trusted end-user key to each model request."""
 
     async def process(self, context: ChatContext, call_next: Callable[[], Awaitable[None]]) -> None:
         end_user_identity = _current_end_user_identity.get()
@@ -41,7 +38,7 @@ class EndUserIdentityForwardingMiddleware(ChatMiddleware):
 
 
 class EndUserIdentityScopedResponsesHostServer(ResponsesHostServer):
-    """Scope the APIM-derived key or direct-Foundry fallback to the stream."""
+    """Scope the APIM-derived key or direct-Foundry fallback to the response stream."""
 
     async def _handle_response(
         self,

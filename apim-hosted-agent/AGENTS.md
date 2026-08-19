@@ -8,7 +8,7 @@ This project is a **Microsoft Foundry hosted agent** — a containerized AI agen
 - `src/` — hosted-agent source, dependencies, and container definition
 - `infra/apim.bicep` — APIM service, shared configuration, and module orchestration
 - `infra/modules/apim-agent.bicep` — hosted-agent ingress
-- `infra/modules/apim-model.bicep` — model gateways, product, token metadata, and links
+- `infra/modules/apim-model.bicep` — model gateways, portal Product, Admin connection, and links
 - `infra/modules/apim-tool-*.bicep` — one APIM module per MCP tool
 - `infra/foundry.bicep` — Foundry project RBAC and Bicep-owned MCP connections
 - `infra/*.parameters.json` — azd parameter mappings for the Bicep layers

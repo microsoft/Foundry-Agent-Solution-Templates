@@ -1,15 +1,10 @@
 <policies>
   <inbound>
-    <base />
     <validate-azure-ad-token
       tenant-id="__TENANT_ID__"
       header-name="Authorization"
-      output-token-variable-name="agent-token"
       failed-validation-httpcode="401"
-      failed-validation-error-message="A valid hosted-agent identity token is required.">
-      <client-application-ids>
-        <application-id>{{foundry-agent-principal-id}}</application-id>
-      </client-application-ids>
+      failed-validation-error-message="A valid hosted-agent managed-identity token is required.">
       <audiences>
         <audience>https://ai.azure.com</audience>
       </audiences>
@@ -19,15 +14,13 @@
         </claim>
       </required-claims>
     </validate-azure-ad-token>
+    <include-fragment fragment-id="foundry-model-user-level" />
     <set-backend-service backend-id="__BACKEND_ID__" />
   </inbound>
   <backend>
     <base />
   </backend>
   <outbound>
-    <set-header name="x-oauth-model-gateway" exists-action="override">
-      <value>true</value>
-    </set-header>
     <base />
   </outbound>
   <on-error>

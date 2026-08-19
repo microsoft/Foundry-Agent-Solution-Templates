@@ -8,7 +8,10 @@
       </return-response>
     </when>
   </choose>
-  <set-variable name="endUserDeploymentName" value="@((string)context.Request.Foundry.Deployment)" />
+  <set-variable name="endUserDeploymentName" value='@{
+    var body = context.Request.Body.As&lt;JObject&gt;(preserveContent: true);
+    return (string)(body["model"] ?? "__MODEL_DEPLOYMENT__");
+  }' />
   <set-variable name="endUserCounterKey" value='@("project/__PROJECT_NAME__/end-user/" + (string)context.Variables["endUserKey"] + "/deployment/" + (string)context.Variables["endUserDeploymentName"] + "/user-token-limit/{{policy-user-token-limit-per-minute}}/quota/{{policy-user-token-quota}}/period/{{policy-user-token-quota-period}}")' />
   <set-variable name="endUserTokenQuotaPeriod" value="{{policy-user-token-quota-period}}" />
   <choose>

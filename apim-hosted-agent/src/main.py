@@ -1,11 +1,11 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-import asyncio
 import os
 
 from agent_framework import Agent
 from agent_framework.foundry import FoundryChatClient
 from agent_framework_foundry_hosting import FoundryToolbox
+from azure.ai.agentserver.core.tasks import set_resilient_tasks_enabled
 from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
 
@@ -16,6 +16,9 @@ from end_user_identity import (
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Stored hosted Responses requests require the runtime's durable task manager.
+set_resilient_tasks_enabled(True)
 
 
 async def main():
@@ -42,9 +45,6 @@ async def main():
         client=client,
         instructions="You are a friendly assistant. Keep your answers brief.",
         tools=toolbox,
-        # History will be managed by the hosting infrastructure, thus there
-        # is no need to store history by the service. Learn more at:
-        # https://developers.openai.com/api/reference/resources/responses/methods/create
         default_options={"store": False},
     )
 
@@ -53,4 +53,6 @@ async def main():
 
 
 if __name__ == "__main__":
+    import asyncio
+
     asyncio.run(main())

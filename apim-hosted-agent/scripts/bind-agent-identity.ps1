@@ -50,8 +50,8 @@ if ($foundryUserAssignments.Count -eq 0) {
     --set "properties.value=$principalId" `
     --output none
 if ($LASTEXITCODE -ne 0) {
-    throw 'Unable to bind the hosted-agent identity to the OAuth APIM model gateway.'
+    throw 'Unable to authorize the hosted-agent identity on the direct APIM Responses route.'
 }
 
 Write-Host "Foundry User assigned to hosted-agent principal $principalId."
-Write-Host "OAuth APIM model gateway bound to hosted-agent principal $principalId."
+Write-Host "Direct APIM Responses route bound to hosted-agent principal $principalId."

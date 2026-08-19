@@ -14,20 +14,22 @@ It provides:
 The sample includes:
 
 - **Four or five APIM APIs:** a hosted-agent ingress API, a portal-compatible
-  model API, a separate OAuth model API used by the agent, one Microsoft Learn
-  MCP API, and one GitHub MCP API when GitHub OAuth is configured;
-
+  subscription-key model API, a managed-identity model API used by a Foundry
+  Admin connection, one Microsoft Learn MCP API, and one GitHub MCP API when
+  GitHub OAuth is configured;
 - **Agent ingress policies:** rate-limit requests by source IP, validate
   Microsoft Entra ID bearer tokens for the `https://ai.azure.com` audience,
-  derive a trusted per-user key from the token's `tid` and `oid` claims, and
-  forward requests to Foundry. The `/responses` operation applies inbound
+  derive a trusted per-user key from the token's `tid` and `oid`, and forward
+  requests to Foundry. The `/responses` operation applies inbound
   prompt-injection detection and harm-category filtering, plus outbound
   harm-category filtering;
-- **Model gateway policies:** enforce Bicep-configured aggregate project limits
-  on a subscription-key API, and expose a separate managed-identity OAuth API
-  for the hosted agent with per-user limits derived by APIM
-  from the caller's Entra `tid` and `oid`. Model request and response harm
-  input and non-streaming output safety is enforced at the APIM agent boundary.
+- **Model gateway policies:** retain a portal-compatible subscription-key API
+  and expose a separate API for the account-level Foundry Admin-connected
+  model. The same API also exposes a project-compatible
+  Responses route used directly by the hosted agent's `FoundryChatClient`.
+  Middleware sends `x-client-end-user-key`; APIM validates the hosted identity
+  and applies the per-user token limit. APIM uses managed identity for the backend.
+  Model input and non-streaming output safety is enforced at the APIM agent boundary.
   Streaming SSE output passes through unchanged because Content Safety buffering
   would consume the event stream. The model
   operation scans non-streaming model output only; streaming model traffic is
@@ -58,11 +60,11 @@ You need:
   subscription or target resource-group scope;
 - **Foundry Owner** on the Foundry resource;
 - Permission and available quota to deploy and use a model in Microsoft Foundry.
-  The example configuration below uses `gpt-5-mini` version `2025-08-07` with
-  10 Data Zone Standard capacity units.
+  The example configuration uses `gpt-5.6-luna` version `2026-07-09` with one
+  Data Zone Standard capacity unit.
 
-> **Note:** Change the model and SKU under `services.project.deployments` in
-> `azure.yaml`, but keep the deployment name `agent-model`.
+> **Note:** Keep `services.project.deployments` in `azure.yaml` and
+> `modelDeploymentName` in `infra/apim.parameters.json` aligned.
 
 Sign in to both CLIs with the same tenant:
 
@@ -123,8 +125,10 @@ azd provision --no-prompt
 
 Provisioning creates the resource group, Foundry account/project/model, Learn
 and GitHub connections, RBAC, and APIM service, backends, APIs, policies, named
-values, product, and resource links. The Learn and GitHub connections are
-declared in `infra/foundry.bicep`. The postprovision hook only canonicalizes
+values, product, resource links, and the shared Admin-connected model. The
+Admin connection uses project managed identity and appears under the Foundry
+resource's **Admin > Connected models** page. The Learn and GitHub connections
+are declared in `infra/foundry.bicep`. The postprovision hook only canonicalizes
 resource links. Step 4 deploys the toolbox and agent.
 
 > [!NOTE]
@@ -181,15 +185,11 @@ $body | curl.exe --request POST $agentGateway `
   --data-binary '@-'
 ```
 
-APIM derives the model rate-limit key from the authenticated user. Use the same
-user to test one counter, or sign in as another user to test a separate counter.
-See [APIM Policy Reference](APIM-POLICIES.md#end-user-identity-flow) for details.
-
-> [!IMPORTANT]
-> Do not use the Foundry playground to validate this sample's per-user model
-> limit. The playground bypasses the APIM agent ingress that derives the trusted
-> user key, so direct Foundry and playground calls share the `default_user`
-> model-limit counter.
+The hosted agent points `FoundryChatClient` at the project-compatible APIM
+endpoint and uses the deployment name directly. Middleware adds the trusted
+`x-client-end-user-key` to every Responses request, and the operation policy
+applies a separate model token counter for each Entra tenant/user pair. The
+account-level Admin connection remains available for other Foundry workloads.
 
 If the agent contains an OAuth MCP, the first request that uses it returns an
 `oauth_consent_request` with a one-time consent URL. Open that URL, authorize
@@ -198,10 +198,11 @@ OAuth token for subsequent tool calls.
 
 ## Customize limits
 
-Change per-user limits in **API Management > Named values**. Named-value changes
-affect policy execution without changing policy XML. Aggregate project limits
-are rendered from Bicep into both the subscription-key model API runtime policy
-and the Foundry portal Product Policy.
+Change per-user model limits, request-rate, GitHub governance, and Content
+Safety settings in **API Management > Named values**. Named-value changes affect
+policy execution without changing policy XML. The portal-compatible model API
+uses built-in APIM Product subscription-key authentication and has no aggregate
+token policy.
 
 `azd provision --no-prompt` overwrites manual named-value changes. Update the
 corresponding Bicep value before provisioning when a change must persist.
@@ -209,24 +210,22 @@ corresponding Bicep value before provisioning when a change must persist.
 ## Policy Defaults
 
 APIM exposes exactly 14 administrator-facing named values. Deployment wiring
-such as tenant ID, managed-identity principal ID, backend ID, project name, and
-model deployment name is embedded by Bicep and is not shown as policy
+such as tenant ID, project managed-identity principal ID, backend ID, project
+name, and model deployment name is embedded by Bicep and is not shown as policy
 configuration.
 
 | Policy XML | APIM scope and purpose | Named values (default) |
 | --- | --- | --- |
-| `foundry-agent-ingress-policy.xml` | Agent API: validate the bearer token, derive the trusted user key from `tid` and `oid`, and rate-limit by source IP | <ul><li>`policy-agent-rate-limit-requests` (`60`)</li><li>`policy-agent-rate-limit-window-seconds` (`60`)</li></ul> |
+| `foundry-agent-ingress-policy.xml` | Agent API: validate the bearer token, derive the trusted user key, and rate-limit by source IP | <ul><li>`policy-agent-rate-limit-requests` (`60`)</li><li>`policy-agent-rate-limit-window-seconds` (`60`)</li></ul> |
 | `foundry-agent-content-safety-policy.xml` | Agent `/responses` operation: inbound prompt-injection and harm filtering, plus outbound harm filtering | <ul><li>Five shared `policy-content-safety-*` values</li></ul> |
-| `foundry-project-model-key-auth-policy.xml` | Subscription-key model API: select the Foundry backend and enforce Product-configured aggregate project limits | <ul><li>No named values; callers use the `api-key` APIM subscription-key header</li></ul> |
-| `foundry-model-oauth-policy.xml` | OAuth model API: authorize the hosted-agent identity and select the Foundry backend | <ul><li>No named values except deployment wiring</li></ul> |
-| `foudnry-model-content-safety-policy.xml` | OAuth model POST operation: enforce per-user limits and scan model content | <ul><li>Three user-limit values through the fragment</li><li>Four shared harm thresholds</li></ul> |
-| `foundry-model-user-level-policy.xml` | Policy fragment: validate the propagated end-user key and enforce per-user token limits | <ul><li>`policy-user-token-limit-per-minute` (`1000000`)</li><li>`policy-user-token-quota` (`10000000`)</li><li>`policy-user-token-quota-period` (`Hourly`)</li></ul> |
-| `foundry-project-token-policy.xml` | Product policy: publish the same deployment token metadata in the Foundry portal | <ul><li>No named values; Bicep renders `modelTokenLimit`, `modelTokenQuota`, and `modelTokenQuotaPeriod` into the XML</li></ul> |
+| `foundry-hosted-admin-model-policy.xml` | Admin-connection routes: authorize the project identity and select the Cognitive Services managed-identity backend | <ul><li>No named values</li></ul> |
+| `foundry-hosted-direct-responses-policy.xml` | Direct hosted-agent Responses route: authorize the hosted identity, apply the per-user fragment, and select the Foundry project backend | <ul><li>`foundry-agent-principal-id` plus three user-limit values through the fragment</li></ul> |
+| `foundry-model-user-level-policy.xml` | Validate `x-client-end-user-key` and enforce its per-user token counter | <ul><li>Three user-limit values</li></ul> |
 | `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API: CORS, per-caller rate limiting, and the shared Content Safety fragment | <ul><li>`policy-tool-rate-limit-requests` (`60`)</li><li>`policy-tool-rate-limit-window-seconds` (`60`)</li><li>Five shared Content Safety values through the fragment</li></ul> |
 | `foundry-tool-github-mcp-policy.xml` | GitHub MCP API: validate GitHub OAuth, apply the username/tool denylists, rate-limit by GitHub user ID, and include the shared Content Safety fragment | <ul><li>`policy-github-blocked-users` (`__none__`)</li><li>`policy-github-blocked-tools` (`__none__`)</li><li>`policy-tool-rate-limit-requests` (`60`)</li><li>`policy-tool-rate-limit-window-seconds` (`60`)</li><li>Five shared Content Safety values through the fragment</li></ul> |
 | `foundry-tool-content-safety-policy.xml` | Shared MCP policy fragment: harm-category filtering and Prompt Shield | <ul><li>`policy-content-safety-hate-threshold` (`4`)</li><li>`policy-content-safety-self-harm-threshold` (`4`)</li><li>`policy-content-safety-sexual-threshold` (`4`)</li><li>`policy-content-safety-violence-threshold` (`4`)</li><li>`policy-content-safety-prompt-shield-enabled` (`true`)</li></ul> |
 
-For request flow, counter keys, OAuth scopes, Content Safety behavior, and
+For request flow, counter keys, managed-identity trust, OAuth scopes, Content Safety behavior, and
 deployment details for every policy, see [APIM Policy Reference](APIM-POLICIES.md).
 
 ## Current limitations
@@ -241,30 +240,27 @@ RBAC on the Foundry resources; APIM authentication and authorization policies
 alone cannot grant that downstream access. A future version is expected to use
 token exchange or another delegated downstream identity pattern.
 
-### Foundry shows only project-linked model policy metadata
+### Custom policies are managed in API Management
 
-The current Foundry and APIM integration exposes only the model token metadata
-created by `foundry-project-token-policy.xml` in the Foundry APIM gateway/model
-experience. The other policies in `infra/policies`—including agent ingress,
-operation-level Content Safety, per-user limits, and MCP governance—are not
-shown or managed there. Administrators must manage those policies in the
-standard API Management policy experience rather than the APIM AI model view.
-This separation is a current limitation of the Foundry–APIM connection and may
-change as the integration evolves.
+The Foundry portal retains the linked APIM model API and Product registration,
+but it does not expose the custom agent ingress, operation-level Content Safety,
+Admin-connection authorization, per-user quota, or MCP governance policies.
+Administrators manage those policies in the standard API Management policy
+experience.
 
 
 ## Troubleshooting
 
 ### Provisioning fails with `InsufficientQuota`
 
-The example model configuration requests 10 `gpt-5-mini` Data Zone Standard
-capacity units in `eastus2`. The failure can come from either the Foundry
+The example model configuration requests one `gpt-5.6-luna` Data Zone Standard
+capacity unit in `eastus2`. The failure can come from either the Foundry
 account-count quota or the model quota. Inspect both:
 
 ```powershell
 az cognitiveservices usage list `
   --location eastus2 `
-  --query "[?name.value=='AIServices.S0.AccountCount' || name.value=='OpenAI.DataZoneStandard.gpt-5-mini'].{Quota:name.value,Current:currentValue,Limit:limit}" `
+  --query "[?name.value=='AIServices.S0.AccountCount' || name.value=='OpenAI.DataZoneStandard.gpt-5.6-luna'].{Quota:name.value,Current:currentValue,Limit:limit}" `
   --output table
 ```
 
@@ -293,9 +289,8 @@ An ARM token is not valid for the agent ingress.
 
 ### Model calls return HTTP 401
 
-Run `scripts/bind-agent-identity.ps1` after deploying the agent and
-confirm that the deployed agent identity has the required Azure RBAC role on
-the Foundry project.
+Confirm the hosted-agent identity has **Foundry User**, the Admin connection uses
+`ProjectManagedIdentity`, and its target ends in `/ai-gateway/models`.
 
 ## Cleanup
 

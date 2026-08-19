@@ -1,0 +1,29 @@
+<policies>
+  <inbound>
+    <base />
+    <validate-azure-ad-token
+      tenant-id="__TENANT_ID__"
+      header-name="Authorization"
+      failed-validation-httpcode="401"
+      failed-validation-error-message="A valid Foundry project managed-identity token is required.">
+      <audiences>
+        <audience>https://cognitiveservices.azure.com</audience>
+      </audiences>
+      <required-claims>
+        <claim name="oid" match="any">
+          <value>__PROJECT_PRINCIPAL_ID__</value>
+        </claim>
+      </required-claims>
+    </validate-azure-ad-token>
+    <set-backend-service backend-id="__BACKEND_ID__" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
