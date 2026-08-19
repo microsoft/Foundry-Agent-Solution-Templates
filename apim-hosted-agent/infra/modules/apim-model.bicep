@@ -192,7 +192,7 @@ resource oauthPostContentSafetyPolicy 'Microsoft.ApiManagement/service/apis/oper
   name: 'policy'
   properties: {
     format: 'rawxml'
-    value: loadTextContent('../policies/foudnry-model-content-safety-policy.xml')
+    value: loadTextContent('../policies/foundry-model-content-safety-policy.xml')
   }
   dependsOn: [
     oauthOperations

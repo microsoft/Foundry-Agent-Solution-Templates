@@ -11,7 +11,7 @@ it is deployed, and how requests flow through it.
 | `foundry-agent-content-safety-policy.xml` | Hosted-agent `/responses` operation | Apply inbound and outbound Content Safety |
 | `foundry-project-model-key-auth-policy.xml` | Subscription-key model API | Select the model backend and enforce Product-configured aggregate project limits |
 | `foundry-model-oauth-policy.xml` | OAuth model API | Authenticate the hosted agent and select the model backend |
-| `foudnry-model-content-safety-policy.xml` | OAuth model POST operation | Apply per-user token limits and model Content Safety |
+| `foundry-model-content-safety-policy.xml` | OAuth model POST operation | Apply per-user token limits and model Content Safety |
 | `foundry-model-user-level-policy.xml` | Policy fragment | Validate the propagated end-user key and apply per-user token limits |
 | `foundry-project-token-policy.xml` | Portal Product | Publish model token-limit metadata for Foundry Portal |
 | `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API | Apply CORS, caller rate limiting, and the shared tool Content Safety fragment |
@@ -100,7 +100,7 @@ Safety.
 
 The OAuth POST operation separately includes the
 `foundry-model-user-level` fragment and scans model content through
-`foudnry-model-content-safety-policy.xml`. It does not force a Foundry RAI
+`foundry-model-content-safety-policy.xml`. It does not force a Foundry RAI
 policy.
 
 ### `foundry-model-user-level-policy.xml`

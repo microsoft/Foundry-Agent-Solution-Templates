@@ -46,7 +46,11 @@ The sample includes:
 
 ## Run the agent
 
-Run every command from the repository root.
+Run every command from the sample directory:
+
+```powershell
+Set-Location .\apim-hosted-agent
+```
 
 ### 1. Prerequisites
 
@@ -56,7 +60,8 @@ You need:
 - [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd);
 - **Owner**, or both **Contributor** and **User Access Administrator**, at the
   subscription or target resource-group scope;
-- **Foundry Owner** on the Foundry resource;
+- **Foundry User** at the subscription scope, or on the new Foundry resource
+  before deploying and invoking the agent. **Foundry Owner** is not required;
 - Permission and available quota to deploy and use a model in Microsoft Foundry.
   The example configuration below uses `gpt-5-mini` version `2025-08-07` with
   10 Data Zone Standard capacity units.
@@ -219,7 +224,7 @@ configuration.
 | `foundry-agent-content-safety-policy.xml` | Agent `/responses` operation: inbound prompt-injection and harm filtering, plus outbound harm filtering | <ul><li>Five shared `policy-content-safety-*` values</li></ul> |
 | `foundry-project-model-key-auth-policy.xml` | Subscription-key model API: select the Foundry backend and enforce Product-configured aggregate project limits | <ul><li>No named values; callers use the `api-key` APIM subscription-key header</li></ul> |
 | `foundry-model-oauth-policy.xml` | OAuth model API: authorize the hosted-agent identity and select the Foundry backend | <ul><li>No named values except deployment wiring</li></ul> |
-| `foudnry-model-content-safety-policy.xml` | OAuth model POST operation: enforce per-user limits and scan model content | <ul><li>Three user-limit values through the fragment</li><li>Four shared harm thresholds</li></ul> |
+| `foundry-model-content-safety-policy.xml` | OAuth model POST operation: enforce per-user limits and scan model content | <ul><li>Three user-limit values through the fragment</li><li>Four shared harm thresholds</li></ul> |
 | `foundry-model-user-level-policy.xml` | Policy fragment: validate the propagated end-user key and enforce per-user token limits | <ul><li>`policy-user-token-limit-per-minute` (`1000000`)</li><li>`policy-user-token-quota` (`10000000`)</li><li>`policy-user-token-quota-period` (`Hourly`)</li></ul> |
 | `foundry-project-token-policy.xml` | Product policy: publish the same deployment token metadata in the Foundry portal | <ul><li>No named values; Bicep renders `modelTokenLimit`, `modelTokenQuota`, and `modelTokenQuotaPeriod` into the XML</li></ul> |
 | `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API: CORS, per-caller rate limiting, and the shared Content Safety fragment | <ul><li>`policy-tool-rate-limit-requests` (`60`)</li><li>`policy-tool-rate-limit-window-seconds` (`60`)</li><li>Five shared Content Safety values through the fragment</li></ul> |
