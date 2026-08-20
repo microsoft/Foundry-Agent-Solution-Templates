@@ -1,31 +1,19 @@
 <fragment>
   <set-variable name="endUserKey" value='@(context.Request.Headers.GetValueOrDefault("x-client-end-user-key", ""))' />
   <choose>
-    <when condition='@(!Regex.IsMatch((string)context.Variables["endUserKey"], @"^(platform/[0-9a-f]{64}|default_user)$"))'>
+    <when condition='@(!Regex.IsMatch((string)context.Variables["endUserKey"], @"^platform/[0-9a-f]{64}$"))'>
       <return-response>
         <set-status code="403" reason="Forbidden" />
-        <set-body>A trusted end-user identity is required.</set-body>
+        <set-body>A valid platform-derived end-user identity is required.</set-body>
       </return-response>
     </when>
   </choose>
-  <set-variable name="endUserDeploymentName" value="@((string)context.Request.Foundry.Deployment)" />
-  <set-variable name="endUserCounterKey" value='@("project/__PROJECT_NAME__/end-user/" + (string)context.Variables["endUserKey"] + "/deployment/" + (string)context.Variables["endUserDeploymentName"] + "/user-token-limit/{{policy-user-token-limit-per-minute}}/quota/{{policy-user-token-quota}}/period/{{policy-user-token-quota-period}}")' />
-  <set-variable name="endUserTokenQuotaPeriod" value="{{policy-user-token-quota-period}}" />
-  <choose>
-    <when condition='@(((string)context.Variables["endUserTokenQuotaPeriod"]) == "Hourly")'>
-      <llm-token-limit counter-key='@((string)context.Variables["endUserCounterKey"])' tokens-per-minute="{{policy-user-token-limit-per-minute}}" token-quota="{{policy-user-token-quota}}" token-quota-period="Hourly" estimate-prompt-tokens="true" />
-    </when>
-    <when condition='@(((string)context.Variables["endUserTokenQuotaPeriod"]) == "Daily")'>
-      <llm-token-limit counter-key='@((string)context.Variables["endUserCounterKey"])' tokens-per-minute="{{policy-user-token-limit-per-minute}}" token-quota="{{policy-user-token-quota}}" token-quota-period="Daily" estimate-prompt-tokens="true" />
-    </when>
-    <when condition='@(((string)context.Variables["endUserTokenQuotaPeriod"]) == "Weekly")'>
-      <llm-token-limit counter-key='@((string)context.Variables["endUserCounterKey"])' tokens-per-minute="{{policy-user-token-limit-per-minute}}" token-quota="{{policy-user-token-quota}}" token-quota-period="Weekly" estimate-prompt-tokens="true" />
-    </when>
-    <when condition='@(((string)context.Variables["endUserTokenQuotaPeriod"]) == "Monthly")'>
-      <llm-token-limit counter-key='@((string)context.Variables["endUserCounterKey"])' tokens-per-minute="{{policy-user-token-limit-per-minute}}" token-quota="{{policy-user-token-quota}}" token-quota-period="Monthly" estimate-prompt-tokens="true" />
-    </when>
-    <otherwise>
-      <llm-token-limit counter-key='@((string)context.Variables["endUserCounterKey"])' tokens-per-minute="{{policy-user-token-limit-per-minute}}" token-quota="{{policy-user-token-quota}}" token-quota-period="Yearly" estimate-prompt-tokens="true" />
-    </otherwise>
-  </choose>
+  <llm-token-limit
+    counter-key='@("project/__PROJECT_NAME__/end-user/" + (string)context.Variables["endUserKey"] + "/tpm/{{policy-user-tokens-per-minute}}/quota-hour/{{policy-user-token-quota-per-hour}}")'
+    tokens-per-minute="{{policy-user-tokens-per-minute}}"
+    token-quota="{{policy-user-token-quota-per-hour}}"
+    token-quota-period="Hourly"
+    remaining-tokens-header-name="remaining-tokens"
+    remaining-quota-tokens-header-name="remaining-quota-tokens"
+    estimate-prompt-tokens="false" />
 </fragment>

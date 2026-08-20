@@ -5,10 +5,10 @@
       "value": "${AZURE_AI_ACCOUNT_NAME}"
     },
     "foundryProjectName": {
-      "value": "${AZURE_ENV_NAME}"
+      "value": "${AZURE_AI_PROJECT_NAME}"
     },
     "learnMcpUrl": {
-      "value": "${MCP_URL}"
+      "value": "${MSLEARN_MCP_URL}"
     },
     "githubMcpUrl": {
       "value": "${GITHUB_MCP_URL}"

@@ -9,23 +9,8 @@ param foundryAccountName string
 @description('Microsoft Foundry project name.')
 param foundryProjectName string
 
-@description('Foundry model deployment name used by token policy metadata.')
+@description('Foundry model deployment exposed through the model gateways.')
 param modelDeploymentName string
-
-@minValue(1)
-param modelTokenLimit int
-
-@minValue(1)
-param modelTokenQuota int
-
-@allowed([
-  'Hourly'
-  'Daily'
-  'Weekly'
-  'Monthly'
-  'Yearly'
-])
-param modelTokenQuotaPeriod string
 param tenantId string
 
 var methods = [
@@ -39,30 +24,43 @@ var methods = [
   'TRACE'
 ]
 var productName = take('${toLower(foundryAccountName)}-${toLower(foundryProjectName)}-ai-${uniqueString(resourceGroup().id, foundryAccountName, foundryProjectName)}', 80)
-var oauthApiId = '${toLower(foundryAccountName)}-oauth'
-var oauthApiPath = '${toLower(foundryAccountName)}-oauth'
-var deploymentPolicySegment = replace(toLower(modelDeploymentName), '_', '-')
-var portalModelPolicy = replace(loadTextContent('../policies/foundry-project-model-key-auth-policy.xml'), '__BACKEND_ID__', foundryAccountName)
-var oauthModelPolicy = replace(replace(loadTextContent('../policies/foundry-model-oauth-policy.xml'), '__TENANT_ID__', tenantId), '__BACKEND_ID__', foundryAccountName)
-var userLevelPolicy = replace(loadTextContent('../policies/foundry-model-user-level-policy.xml'), '__PROJECT_NAME__', foundryProjectName)
-var projectTokenPolicy = replace(
-  replace(
-    replace(
-      replace(
-        loadTextContent('../policies/foundry-project-token-policy.xml'),
-        '__MODEL_DEPLOYMENT__',
-        deploymentPolicySegment
-      ),
-      '__TOKEN_LIMIT__',
-      string(modelTokenLimit)
-    ),
-    '__TOKEN_QUOTA__',
-    string(modelTokenQuota)
-  ),
-  '__TOKEN_QUOTA_PERIOD__',
-  modelTokenQuotaPeriod
+var directApiId = '${toLower(foundryAccountName)}-model-gateway'
+var directApiPath = 'ai-gateway'
+var portalBackendPolicy = replace(
+  '''
+  <policies>
+    <inbound>
+      <base />
+      <set-backend-service backend-id="__BACKEND_ID__" />
+    </inbound>
+    <backend>
+      <base />
+    </backend>
+    <outbound>
+      <base />
+    </outbound>
+    <on-error>
+      <base />
+    </on-error>
+  </policies>
+  ''',
+  '__BACKEND_ID__',
+  foundryAccountName
 )
-
+var directResponsesPolicy = replace(
+  replace(
+    loadTextContent('../policies/foundry-model-gateway-policy.xml'),
+    '__TENANT_ID__',
+    tenantId
+  ),
+  '__BACKEND_ID__',
+  foundryAccountName
+)
+var userLevelPolicy = replace(
+  loadTextContent('../policies/foundry-model-user-level-policy.xml'),
+  '__PROJECT_NAME__',
+  foundryProjectName
+)
 resource apim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
   name: apimName
 }
@@ -82,6 +80,7 @@ resource backend 'Microsoft.ApiManagement/service/backends@2024-05-01' = {
   properties: {
     protocol: 'http'
     url: 'https://${foundryAccount.name}.services.ai.azure.com/'
+    resourceId: uri(environment().resourceManager, foundryAccount.id)
     credentials: {
       managedIdentity: {
         resource: 'https://ai.azure.com/'
@@ -100,7 +99,7 @@ resource portalApi 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
   properties: {
     displayName: '${foundryProjectName} - Model API (API Key + Portal Admin Center)'
     apiRevision: '1'
-    description: 'Portal-compatible subscription-key model gateway with aggregate project limits.'
+    description: 'Portal-compatible subscription-key model gateway.'
     path: foundryAccountName
     protocols: [
       'https'
@@ -128,21 +127,23 @@ resource portalPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01'
   name: 'policy'
   properties: {
     format: 'rawxml'
-    value: portalModelPolicy
+    value: portalBackendPolicy
   }
   dependsOn: [
     portalOperations
+    backend
   ]
 }
 
-resource oauthApi 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
+resource directModelApi 'Microsoft.ApiManagement/service/apis@2025-03-01-preview' = {
   parent: apim
-  name: oauthApiId
+  name: directApiId
   properties: {
     apiRevision: '1'
-    description: 'OAuth model gateway restricted to the hosted-agent managed identity.'
-    displayName: '${foundryProjectName} - Model API (OAuth + Hosted Agent Runtime)'
-    path: oauthApiPath
+    backendId: backend.name
+    description: 'Foundry Responses model API used by the hosted agent.'
+    displayName: '${foundryProjectName} - Hosted agent AI model'
+    path: directApiPath
     protocols: [
       'https'
     ]
@@ -150,53 +151,49 @@ resource oauthApi 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
   }
 }
 
-resource oauthOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = [for method in methods: {
-  parent: oauthApi
-  name: '${toLower(method)}-default'
+resource aiModelTag 'Microsoft.ApiManagement/service/tags@2024-05-01' = {
+  parent: apim
+  name: 'aimodel'
   properties: {
-    displayName: method
-    method: method
-    urlTemplate: '/*'
+    displayName: 'aimodel'
   }
-}]
-
-resource oauthPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = {
-  parent: oauthApi
-  name: 'policy'
-  properties: {
-    format: 'rawxml'
-    value: oauthModelPolicy
-  }
-  dependsOn: [
-    oauthOperations
-  ]
 }
 
-resource oauthPostOperation 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' existing = {
-  parent: oauthApi
-  name: 'post-default'
+resource directModelApiTag 'Microsoft.ApiManagement/service/apis/tags@2024-05-01' = {
+  parent: directModelApi
+  name: aiModelTag.name
+}
+
+resource responsesOperation 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: directModelApi
+  name: 'createResponses'
+  properties: {
+    description: 'Creates a model response through the project-compatible direct hosted-agent route.'
+    displayName: 'Create response'
+    method: 'POST'
+    urlTemplate: '/api/projects/${foundryProjectName}/openai/v1/responses'
+  }
 }
 
 resource userLevelPolicyFragment 'Microsoft.ApiManagement/service/policyFragments@2024-05-01' = {
   parent: apim
   name: 'foundry-model-user-level'
   properties: {
-    description: 'Per-user model token limit derived from the trusted tenant and object identifiers.'
+    description: 'Per-user model token limit for direct hosted-agent Responses calls.'
     format: 'rawxml'
     value: userLevelPolicy
   }
 }
 
-resource oauthPostContentSafetyPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
-  parent: oauthPostOperation
+resource directModelApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = {
+  parent: directModelApi
   name: 'policy'
   properties: {
     format: 'rawxml'
-    value: loadTextContent('../policies/foundry-model-content-safety-policy.xml')
+    value: directResponsesPolicy
   }
   dependsOn: [
-    oauthOperations
-    oauthPolicy
+    responsesOperation
     userLevelPolicyFragment
   ]
 }
@@ -231,15 +228,6 @@ resource productSubscription 'Microsoft.ApiManagement/service/subscriptions@2024
   ]
 }
 
-resource productPolicy 'Microsoft.ApiManagement/service/products/policies@2024-05-01' = {
-  parent: product
-  name: 'policy'
-  properties: {
-    format: 'rawxml'
-    value: projectTokenPolicy
-  }
-}
-
 resource accountToApimLink 'Microsoft.Resources/links@2016-09-01' = {
   scope: foundryAccount
   name: uniqueString(foundryAccount.id, apim.id, 'account-apim')
@@ -265,7 +253,7 @@ resource projectToProductLink 'Microsoft.Resources/links@2016-09-01' = {
 }
 
 output portalProjectEndpoint string = 'https://${apim.name}.azure-api.net/${foundryAccountName}/api/projects/${foundryProjectName}'
-output oauthApiId string = oauthApi.name
-output oauthProjectEndpoint string = 'https://${apim.name}.azure-api.net/${oauthApiPath}/api/projects/${foundryProjectName}'
+output modelDeploymentName string = modelDeploymentName
+output directProjectEndpoint string = 'https://${apim.name}.azure-api.net/${directApiPath}/api/projects/${foundryProjectName}'
 output productName string = product.name
 output productSubscriptionName string = productSubscription.name

@@ -16,21 +16,44 @@ services:
     project:
         host: azure.ai.project
         deployments:
-            - name: agent-model
+            - name: gpt-5.6-luna
               model:
                   format: OpenAI
-                  name: gpt-5-mini
-                  version: "2025-08-07"
+                  name: gpt-5.6-luna
+                  version: "2026-07-09"
               sku:
-                  capacity: 10
+                  capacity: 1
                   name: DataZoneStandard
     tools:
         host: azure.ai.toolbox
         uses:
             - project
         description: Microsoft Learn and GitHub tools through governed APIM MCP gateways.
-        tools: [{ "connection": "github", "name": "github", "require_approval": "always", "server_label": "github", "type": "mcp" }, { "connection": "mslearn", "name": "microsoftlearn", "require_approval": "always", "server_label": "microsoftlearn", "type": "mcp" }]
+        tools:
+            - connection: github
+              name: github
+              require_approval: always
+              server_label: github
+              type: mcp
+            - connection: mslearn
+              name: microsoftlearn
+              require_approval: always
+              server_label: microsoftlearn
+              type: mcp
     agent:
+        name: agent
+        kind: hosted
+        description: An Agent Framework agent with Foundry Toolbox integration.
+        metadata:
+            tags:
+                - Agent Framework
+                - AI Agent Hosting
+                - Azure AI AgentServer
+                - Responses Protocol
+                - Streaming
+        protocols:
+            - protocol: responses
+              version: 2.0.0
         project: src
         host: azure.ai.agent
         language: python
@@ -43,11 +66,9 @@ services:
             - tools
         environmentVariables:
             - name: AGENT_MODEL_DEPLOYMENT
-              value: agent-model
-            - {
-                  name: AGENT_APIM_PROJECT_ENDPOINT,
-                  value: "${APIM_OAUTH_FOUNDRY_PROJECT_ENDPOINT}",
-              }
+              value: ${APIM_FOUNDRY_MODEL_DEPLOYMENT_NAME}
+            - name: AGENT_APIM_PROJECT_ENDPOINT
+              value: ${APIM_FOUNDRY_DIRECT_PROJECT_ENDPOINT}
             - name: AGENT_TOOLBOX_ENDPOINT
               value: ${TOOLBOX_TOOLS_MCP_ENDPOINT}
         codeConfiguration:
@@ -57,24 +78,23 @@ services:
             resources:
                 cpu: "0.5"
                 memory: 1Gi
-        description: An Agent Framework agent with Foundry Toolbox integration.
-        kind: hosted
-        metadata:
-            tags:
-                - Agent Framework
-                - AI Agent Hosting
-                - Azure AI AgentServer
-                - Responses Protocol
-                - Streaming
-        name: agent
-        protocols:
-            - protocol: responses
-              version: 2.0.0
 infra:
     layers:
-                - { provider: microsoft.foundry, path: ., name: foundry }
-                - { provider: bicep, path: infra, module: apim, name: apim, dependsOn: [foundry] }
-                - { provider: bicep, path: infra, module: foundry, name: foundry-project, dependsOn: [apim] }
+        - provider: microsoft.foundry
+          path: .
+          name: foundry
+        - provider: bicep
+          path: infra
+          module: apim
+          name: apim
+          dependsOn:
+              - foundry
+        - provider: bicep
+          path: infra
+          module: foundry
+          name: foundry-project
+          dependsOn:
+              - apim
 workflows:
     up:
         steps:

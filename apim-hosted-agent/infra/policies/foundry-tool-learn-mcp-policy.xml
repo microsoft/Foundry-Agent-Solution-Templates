@@ -18,7 +18,7 @@
     <rate-limit-by-key
       calls="{{policy-tool-rate-limit-requests}}"
       renewal-period="{{policy-tool-rate-limit-window-seconds}}"
-      counter-key="@(context.Subscription != null ? context.Subscription.Id : context.Request.IpAddress)"
+      counter-key='@("caller:" + (context.Subscription != null ? context.Subscription.Id : context.Request.IpAddress) + "/calls/{{policy-tool-rate-limit-requests}}/window/{{policy-tool-rate-limit-window-seconds}}")'
       retry-after-header-name="Retry-After"
       remaining-calls-header-name="x-tool-calls-remaining" />
     <include-fragment fragment-id="foundry-tool-content-safety" />

@@ -29,44 +29,16 @@ param foundryProjectName string
 @description('Microsoft Foundry hosted agent exposed through the APIM ingress route.')
 param foundryAgentName string = 'agent'
 
-@description('Foundry model deployment name used by the project token policy.')
+@description('Foundry model deployment exposed through the model gateways.')
 param modelDeploymentName string
 
 @minValue(1)
-@description('Maximum prompt and completion tokens allowed per minute for the project deployment.')
-param modelTokenLimit int = 1000000
-
-@minValue(1)
-@description('Maximum prompt and completion tokens allowed in the project quota period.')
-param modelTokenQuota int = 10000000
-
-@allowed([
-  'Hourly'
-  'Daily'
-  'Weekly'
-  'Monthly'
-  'Yearly'
-])
-@description('Fixed period used by the project token quota.')
-param modelTokenQuotaPeriod string = 'Hourly'
-
-@minValue(1)
 @description('Maximum prompt and completion tokens allowed per minute for each end user.')
-param modelUserTokenLimit int = 1000000
+param modelUserTokensPerMinute int = 1000
 
 @minValue(1)
-@description('Maximum prompt and completion tokens allowed for each end user in the quota period.')
-param modelUserTokenQuota int = 10000000
-
-@allowed([
-  'Hourly'
-  'Daily'
-  'Weekly'
-  'Monthly'
-  'Yearly'
-])
-@description('Fixed period used by the per-user model token quota.')
-param modelUserTokenQuotaPeriod string = 'Hourly'
+@description('Maximum prompt and completion tokens allowed per hour for each end user.')
+param modelUserTokenQuotaPerHour int = 100
 
 @minValue(1)
 @description('Maximum requests to governed tool routes during each renewal period.')
@@ -126,16 +98,12 @@ var effectiveGithubBlockedUserNames = empty(githubBlockedUserNames) ? '__none__'
 var effectiveGithubBlockedToolNames = empty(githubBlockedToolNames) ? '__none__' : githubBlockedToolNames
 var policyNamedValues = [
   {
-    name: 'policy-user-token-limit-per-minute'
-    value: string(modelUserTokenLimit)
+    name: 'policy-user-tokens-per-minute'
+    value: string(modelUserTokensPerMinute)
   }
   {
-    name: 'policy-user-token-quota'
-    value: string(modelUserTokenQuota)
-  }
-  {
-    name: 'policy-user-token-quota-period'
-    value: modelUserTokenQuotaPeriod
+    name: 'policy-user-token-quota-per-hour'
+    value: string(modelUserTokenQuotaPerHour)
   }
   {
     name: 'policy-agent-rate-limit-requests'
@@ -265,6 +233,19 @@ resource toolContentSafetyPolicyFragment 'Microsoft.ApiManagement/service/policy
   ]
 }
 
+resource modelContentSafetyPolicyFragment 'Microsoft.ApiManagement/service/policyFragments@2024-05-01' = {
+  parent: apim
+  name: 'foundry-model-content-safety'
+  properties: {
+    description: 'Content Safety checks for Foundry Responses model requests.'
+    format: 'rawxml'
+    value: loadTextContent('policies/foundry-model-content-safety-policy.xml')
+  }
+  dependsOn: [
+    contentSafetyBackend
+  ]
+}
+
 module agent 'modules/apim-agent.bicep' = {
   name: 'agent'
   params: {
@@ -288,15 +269,13 @@ module model 'modules/apim-model.bicep' = {
     foundryAccountName: modelApiId
     foundryProjectName: foundryProjectName
     modelDeploymentName: modelDeploymentName
-    modelTokenLimit: modelTokenLimit
-    modelTokenQuota: modelTokenQuota
-    modelTokenQuotaPeriod: modelTokenQuotaPeriod
     tenantId: tenant().tenantId
   }
   dependsOn: [
     policyNamedValueResources
     agentPrincipalNamedValue
     contentSafetyBackend
+    modelContentSafetyPolicyFragment
     apimCognitiveServicesUser
   ]
 }
@@ -332,10 +311,10 @@ output APIM_RESOURCE_ID string = apim.id
 output APIM_GATEWAY_URL string = 'https://${apim.name}.azure-api.net'
 output APIM_AGENT_GATEWAY_URL string = agent.outputs.gatewayUrl
 output APIM_FOUNDRY_PROJECT_ENDPOINT string = model.outputs.portalProjectEndpoint
-output APIM_OAUTH_API_ID string = model.outputs.oauthApiId
-output APIM_OAUTH_FOUNDRY_PROJECT_ENDPOINT string = model.outputs.oauthProjectEndpoint
+output APIM_FOUNDRY_MODEL_DEPLOYMENT_NAME string = model.outputs.modelDeploymentName
+output APIM_FOUNDRY_DIRECT_PROJECT_ENDPOINT string = model.outputs.directProjectEndpoint
 output APIM_FOUNDRY_PRODUCT_NAME string = model.outputs.productName
 output APIM_FOUNDRY_SUBSCRIPTION_NAME string = model.outputs.productSubscriptionName
-output MCP_URL string = learnTool.outputs.gatewayUrl
+output MSLEARN_MCP_URL string = learnTool.outputs.gatewayUrl
 output GITHUB_MCP_ENABLED bool = githubEnabled
 output GITHUB_MCP_URL string = githubEnabled ? githubMcpGatewayUrl : ''

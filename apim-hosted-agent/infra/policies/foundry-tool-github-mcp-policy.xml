@@ -66,7 +66,7 @@
     <rate-limit-by-key
       calls="{{policy-tool-rate-limit-requests}}"
       renewal-period="{{policy-tool-rate-limit-window-seconds}}"
-      counter-key="@(&quot;github-user:&quot; + (string)context.Variables[&quot;githubUserId&quot;])"
+      counter-key='@("github-user:" + (string)context.Variables["githubUserId"] + "/calls/{{policy-tool-rate-limit-requests}}/window/{{policy-tool-rate-limit-window-seconds}}")'
       retry-after-header-name="Retry-After"
       remaining-calls-header-name="x-github-mcp-calls-remaining" />
     <set-header name="Accept" exists-action="override">
