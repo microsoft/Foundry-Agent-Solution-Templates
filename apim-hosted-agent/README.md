@@ -15,7 +15,7 @@ The sample includes:
 
 - **APIM APIs:** a hosted-agent ingress API, a direct hosted-agent model API, and governed MCP tool APIs for Microsoft Learn and GitHub;
 - **Agent ingress policies:** apply authentication, rate limiting, and inbound and outbound Content Safety;
-- **Model gateway policies:** authenticate the hosted agent, enforce harmful-content checks and per-user token limits, and route Responses requests to Foundry with managed identity;
+- **Model gateway policies:** authenticate the hosted agent, enforce harmful-content checks and per-user token limits, and route Responses requests to Foundry with managed identity and TLS certificate chain and hostname validation;
 - **Microsoft Learn MCP policies:** provide per-caller rate limiting and inbound
   and outbound harm-category filtering;
 - **GitHub MCP policies:** validate GitHub OAuth, enforce user and tool denylists,

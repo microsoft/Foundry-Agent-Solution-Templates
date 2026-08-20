@@ -65,6 +65,8 @@ validates the hosted identity
 for the `https://ai.azure.com` audience, includes
 `foundry-model-user-level-policy.xml` to validate `x-client-end-user-key`, and
 selects the project-compatible Foundry backend.
+The APIM backend explicitly validates the Foundry TLS certificate chain and
+certificate hostname.
 
 Before quota enforcement, `foundry-model-content-safety-policy.xml` stores the
 original model request, serializes its `input` property, and applies
