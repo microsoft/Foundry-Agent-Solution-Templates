@@ -9,7 +9,7 @@ It provides:
 
 ## Architecture
 
-![End-to-end request flow through API Management policies and Microsoft Foundry](image/flow.jpg)
+![End-to-end request flow through API Management policies and Microsoft Foundry](image/flow.png)
 
 The sample includes:
 
