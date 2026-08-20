@@ -19,14 +19,11 @@
     "modelDeploymentName": {
       "value": "gpt-5.6-luna"
     },
-    "modelUserTokenLimit": {
-      "value": 1000000
+    "modelUserTokensPerMinute": {
+      "value": 1000
     },
-    "modelUserTokenQuota": {
-      "value": 10000000
-    },
-    "modelUserTokenQuotaPeriod": {
-      "value": "Hourly"
+    "modelUserTokenQuotaPerHour": {
+      "value": 100
     },
     "githubOAuthClientId": {
       "value": "${GITHUB_OAUTH_CLIENT_ID}"

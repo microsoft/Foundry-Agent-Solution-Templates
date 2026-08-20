@@ -14,6 +14,7 @@
         </claim>
       </required-claims>
     </validate-azure-ad-token>
+    <include-fragment fragment-id="foundry-model-content-safety" />
     <include-fragment fragment-id="foundry-model-user-level" />
     <set-backend-service backend-id="__BACKEND_ID__" />
   </inbound>

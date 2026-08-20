@@ -7,10 +7,10 @@ it is deployed, and how requests flow through it.
 
 | Policy XML | APIM scope | Purpose |
 | --- | --- | --- |
-| `foundry-agent-ingress-policy.xml` | Hosted-agent API | Authenticate callers, derive the trusted user key, and apply IP rate limiting |
+| `foundry-agent-ingress-policy.xml` | Hosted-agent API | Authenticate callers and apply IP rate limiting |
 | `foundry-agent-content-safety-policy.xml` | Hosted-agent `/responses` operation | Apply inbound and outbound Content Safety |
-| `foundry-hosted-admin-model-policy.xml` | Integrated Admin-connected model API | Authenticate the project identity and select the Cognitive Services backend |
-| `foundry-hosted-direct-responses-policy.xml` | Integrated model API `createResponses` operation | Authenticate the hosted identity, apply per-user limits, and select the project backend |
+| `foundry-model-gateway-policy.xml` | Hosted-agent model API | Authenticate the hosted identity, apply per-user limits, and select the project backend |
+| `foundry-model-content-safety-policy.xml` | Policy fragment | Apply Content Safety to model Responses requests |
 | `foundry-model-user-level-policy.xml` | Policy fragment | Validate the propagated user key and apply per-user token limits |
 | `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API | Apply CORS, caller rate limiting, and the shared tool Content Safety fragment |
 | `foundry-tool-github-mcp-policy.xml` | GitHub MCP API | Validate GitHub OAuth, enforce username and exact-tool denylists, rate-limit by GitHub user ID, and apply tool Content Safety |
@@ -18,18 +18,17 @@ it is deployed, and how requests flow through it.
 
 ## Named-value inventory
 
-APIM exposes 14 administrator-facing policy named values:
+APIM exposes 13 administrator-facing policy named values:
 
 | Configuration area | Named values |
 | --- | --- |
 | Agent request rate | `policy-agent-rate-limit-requests`, `policy-agent-rate-limit-window-seconds` |
-| Per-user model tokens | `policy-user-token-limit-per-minute`, `policy-user-token-quota`, `policy-user-token-quota-period` |
+| Per-user model tokens | `policy-user-tokens-per-minute`, `policy-user-token-quota-per-hour` |
 | MCP request rate | `policy-tool-rate-limit-requests`, `policy-tool-rate-limit-window-seconds` |
 | GitHub governance | `policy-github-blocked-users`, `policy-github-blocked-tools` |
 | Content Safety | `policy-content-safety-hate-threshold`, `policy-content-safety-self-harm-threshold`, `policy-content-safety-sexual-threshold`, `policy-content-safety-violence-threshold`, `policy-content-safety-prompt-shield-enabled` |
 
-Admin-connection tenant, project-principal, hosted-agent principal, and backend
-values are deployment wiring.
+Hosted-agent principal and backend values are deployment wiring.
 
 `azd provision --no-prompt` reapplies Bicep-owned values and can overwrite
 manual named-value edits. Change the corresponding Bicep value before
@@ -41,9 +40,10 @@ provisioning when a setting must persist.
 
 The policy is attached to the hosted-agent API. It rate-limits requests by
 source IP, validates a Microsoft Entra bearer token for the
-`https://ai.azure.com` audience, hashes `tid:oid` as
-`platform/<sha256>`, and overwrites `x-client-end-user-key` before forwarding
-the request to Foundry.
+`https://ai.azure.com` audience, and forwards the request to Foundry without
+adding a custom end-user identity header. The hosted runtime reads Foundry's
+platform-provided `user_id_key`, hashes it as `platform/<sha256>`, and sends
+that derived key only on its downstream APIM model request.
 
 The separate `foundry-agent-content-safety-policy.xml` operation policy applies
 `llm-content-safety` to inbound and non-streaming outbound content. Streaming
@@ -51,6 +51,9 @@ SSE output bypasses outbound scanning. The four harm thresholds and Prompt Shiel
 setting come from the five `policy-content-safety-*` named values. The ingress policy uses `policy-agent-rate-limit-requests` and
 `policy-agent-rate-limit-window-seconds`. The tenant ID is embedded by Bicep.
 Neither policy detects or redacts PII.
+
+The agent rate-limit counter key includes the configured request count and
+renewal window. Changing either named value starts a fresh counter namespace.
 
 ## Model policies
 
@@ -69,9 +72,6 @@ The API definition matches the Foundry portal-generated shape:
 - managed-identity backend authentication to `https://ai.azure.com/`
 - an active Product-scoped subscription whose name matches the Product
 
-For key retrieval and request examples, see
-[Foundry-managed model API](FOUNDRY-MANAGED-MODEL-API.md).
-
 Callers send an APIM Product subscription key, not a Foundry model key:
 
 ```http
@@ -80,38 +80,33 @@ api-key: <APIM subscription primary-or-secondary key>
 Content-Type: application/json
 ```
 
-### Admin model policies
+### Hosted-agent model policy
 
-The integrated template uses `foundry-hosted-admin-model-policy.xml`. It
-validates a Microsoft Entra token for the
-`https://cognitiveservices.azure.com` audience and requires the `oid` claim to
-match the project identity used by the Admin connection. The policy then selects
-the APIM backend that authenticates to the Foundry account with the APIM
-system-assigned managed identity and the same Cognitive Services audience.
-
-The `createResponses` operation overrides that API-level policy with
-`foundry-hosted-direct-responses-policy.xml`. It validates the hosted identity
+The direct model API is registered in APIM with the `aimodel` tag and an
+Azure-resource-backed Foundry backend, so it appears under **AI Gateway >
+Models**. It uses `foundry-model-gateway-policy.xml` at API scope and
+validates the hosted identity
 for the `https://ai.azure.com` audience, includes
 `foundry-model-user-level-policy.xml` to validate `x-client-end-user-key`, and
 selects the project-compatible Foundry backend.
 
-The API exposes the exact routes used by the connection:
+Before quota enforcement, `foundry-model-content-safety-policy.xml` applies
+`llm-content-safety` directly to the original Responses request and blocks the
+configured harm severities without mutating the backend payload.
 
-- `POST /models/chat/completions`
-- `GET /models/{deploymentName}`
+The API exposes only:
+
 - `POST /api/projects/{projectName}/openai/v1/responses`
-
-The connection target ends in `/ai-gateway/models`, uses
-`ProjectManagedIdentity`, and is shared at account scope so it appears in
-**Admin > Connected models**. The hosted agent uses `FoundryChatClient` and the
-direct project-compatible APIM endpoint, so `x-client-end-user-key` reaches the
-operation policy without traversing the Admin connection.
 
 The hosted-agent counter key is:
 
 ```text
-project/<project>/end-user/<trusted-key>/deployment/<deployment>/user-token-limit/<tpm>/quota/<quota>/period/<period>
+project/<project>/end-user/<trusted-key>/tpm/<tokens-per-minute>/quota-hour/<hourly-quota>
 ```
+
+The fragment applies one `llm-token-limit` rule with a fixed hourly period.
+Changing either configured token limit creates a new counter key, so the new
+limit starts with a fresh counter.
 
 ## MCP tool policies
 
@@ -121,6 +116,8 @@ The Microsoft Learn MCP policy configures CORS, rate-limits by APIM subscription
 ID when present, and otherwise uses the caller IP. It includes the shared
 `foundry-tool-content-safety` fragment for inbound and outbound traffic. It uses
 `policy-tool-rate-limit-requests` and `policy-tool-rate-limit-window-seconds`.
+The counter key includes both configured values, so changing either one starts
+a fresh counter namespace.
 
 ### `foundry-tool-github-mcp-policy.xml`
 
@@ -137,7 +134,9 @@ The GitHub MCP request flow is:
 5. For `tools/list`, add an empty `params` object only when the MCP client omits
    it. JSON-RPC permits omitted parameters, but this keeps the request compatible
    with GitHub MCP instances that require `params`.
-6. Rate-limit using the returned immutable GitHub user ID.
+6. Rate-limit using the returned immutable GitHub user ID plus the configured
+   request count and renewal window, so changing either limit starts a fresh
+   counter namespace.
 7. Apply the shared inbound Content Safety fragment and forward the request.
 8. Add `X-GitHub-MCP-Governed: github-user-oauth` and apply outbound Content
    Safety to the response.

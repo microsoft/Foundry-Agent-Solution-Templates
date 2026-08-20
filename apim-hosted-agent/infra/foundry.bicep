@@ -86,6 +86,9 @@ resource githubConnection 'Microsoft.CognitiveServices/accounts/projects/connect
       'read:user'
     ]
   }
+  dependsOn: [
+    learnConnection
+  ]
 }
 
 @description('Generated OAuth redirect URL for the GitHub MCP connection.')

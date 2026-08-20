@@ -1,5 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
 
+import asyncio
 import os
 
 from agent_framework import Agent
@@ -17,7 +18,7 @@ from end_user_identity import (
 # Load environment variables from .env file
 load_dotenv()
 
-# Stored hosted Responses requests require the runtime's durable task manager.
+# Foundry invokes hosted Responses with store=true, which requires durable tasks.
 set_resilient_tasks_enabled(True)
 
 
@@ -51,8 +52,5 @@ async def main():
     server = EndUserIdentityScopedResponsesHostServer(agent)
     await server.run_async()
 
-
 if __name__ == "__main__":
-    import asyncio
-
     asyncio.run(main())

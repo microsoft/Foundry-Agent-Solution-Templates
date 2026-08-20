@@ -1,8 +1,8 @@
 """Propagate a trusted end-user identity to direct APIM model requests."""
 
 import asyncio
+import hashlib
 import logging
-import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextvars import ContextVar
 from typing import Any
@@ -11,9 +11,7 @@ from agent_framework import ChatContext, ChatMiddleware
 from agent_framework_foundry_hosting import ResponsesHostServer
 
 END_USER_IDENTITY_HEADER = "x-client-end-user-key"
-DEFAULT_END_USER_IDENTITY = "default_user"
 logger = logging.getLogger(__name__)
-_END_USER_KEY_PATTERN = re.compile(r"^platform/[0-9a-f]{64}$")
 
 _current_end_user_identity: ContextVar[str | None] = ContextVar(
     "current_end_user_identity",
@@ -38,7 +36,7 @@ class EndUserIdentityForwardingMiddleware(ChatMiddleware):
 
 
 class EndUserIdentityScopedResponsesHostServer(ResponsesHostServer):
-    """Scope the APIM-derived key or direct-Foundry fallback to the response stream."""
+    """Scope the Foundry platform user identity to the response stream."""
 
     async def _handle_response(
         self,
@@ -46,20 +44,19 @@ class EndUserIdentityScopedResponsesHostServer(ResponsesHostServer):
         context: Any,
         cancellation_signal: asyncio.Event,
     ) -> AsyncIterator[Any]:
-        request_end_user_identity = context.client_headers.get(END_USER_IDENTITY_HEADER)
-        if request_end_user_identity:
-            if not _END_USER_KEY_PATTERN.fullmatch(request_end_user_identity):
-                raise RuntimeError("The trusted APIM end-user identity header is invalid.")
-            end_user_identity = request_end_user_identity
-            identity_source = "apim"
-        else:
-            end_user_identity = DEFAULT_END_USER_IDENTITY
-            identity_source = "direct-foundry"
+        platform_context = getattr(context, "platform_context", None)
+        platform_user_id = getattr(platform_context, "user_id_key", None)
+        if not isinstance(platform_user_id, str) or not platform_user_id:
+            raise RuntimeError("Foundry did not provide a platform user identity.")
+
+        platform_user_id_digest = hashlib.sha256(platform_user_id.encode("utf-8")).hexdigest()
+        end_user_identity = f"platform/{platform_user_id_digest}"
 
         logger.info(
-            "Hosted request end-user key=%s source=%s",
-            end_user_identity,
-            identity_source,
+            "Hosted request user identity source=platform-context "
+            "platform_user_id_length=%d platform_user_id_fingerprint=%s",
+            len(platform_user_id),
+            platform_user_id_digest[:12],
         )
 
         events = await super()._handle_response(request, context, cancellation_signal)
