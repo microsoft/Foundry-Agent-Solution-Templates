@@ -34,7 +34,7 @@ You need:
 - **Owner**, or both **Contributor** and **User Access Administrator**, at the
   subscription or target resource-group scope;
 - **Foundry User** at the subscription scope, or on the new Foundry resource
-  before deploying and invoking the agent. **Foundry Owner** is not required;
+  before deploying and invoking the agent;
 - Permission and available quota to deploy and use a model in Microsoft Foundry.
   The example configuration uses `gpt-5.6-luna` version `2026-07-09` with 100
   Data Zone Standard capacity units.
