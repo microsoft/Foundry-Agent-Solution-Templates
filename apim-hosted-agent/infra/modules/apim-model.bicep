@@ -86,10 +86,6 @@ resource backend 'Microsoft.ApiManagement/service/backends@2024-05-01' = {
         resource: 'https://ai.azure.com/'
       }
     }
-    tls: {
-      validateCertificateChain: false
-      validateCertificateName: false
-    }
   }
 }
 

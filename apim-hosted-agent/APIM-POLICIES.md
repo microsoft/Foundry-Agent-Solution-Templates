@@ -12,9 +12,9 @@ it is deployed, and how requests flow through it.
 | `foundry-model-gateway-policy.xml` | Hosted-agent model API | Authenticate the hosted identity, apply per-user limits, and select the project backend |
 | `foundry-model-content-safety-policy.xml` | Policy fragment | Apply Content Safety to model Responses requests |
 | `foundry-model-user-level-policy.xml` | Policy fragment | Validate the propagated user key and apply per-user token limits |
-| `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API | Apply CORS, caller rate limiting, and the shared tool Content Safety fragment |
+| `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API | Apply caller rate limiting and the shared tool Content Safety fragment |
 | `foundry-tool-github-mcp-policy.xml` | GitHub MCP API | Validate GitHub OAuth, enforce username and exact-tool denylists, rate-limit by GitHub user ID, and apply tool Content Safety |
-| `foundry-tool-content-safety-policy.xml` | Policy fragment | Provide shared inbound/outbound MCP harm filtering and Prompt Shield configuration |
+| `foundry-tool-content-safety-policy.xml` | Policy fragment | Provide shared inbound/outbound MCP harm filtering |
 
 ## Named-value inventory
 
@@ -26,7 +26,7 @@ APIM exposes 13 administrator-facing policy named values:
 | Per-user model tokens | `policy-user-tokens-per-minute`, `policy-user-token-quota-per-hour` |
 | MCP request rate | `policy-tool-rate-limit-requests`, `policy-tool-rate-limit-window-seconds` |
 | GitHub governance | `policy-github-blocked-users`, `policy-github-blocked-tools` |
-| Content Safety | `policy-content-safety-hate-threshold`, `policy-content-safety-self-harm-threshold`, `policy-content-safety-sexual-threshold`, `policy-content-safety-violence-threshold`, `policy-content-safety-prompt-shield-enabled` |
+| Content Safety thresholds and Prompt Shield | `policy-content-safety-hate-threshold`, `policy-content-safety-self-harm-threshold`, `policy-content-safety-sexual-threshold`, `policy-content-safety-violence-threshold`, `policy-content-safety-prompt-shield-enabled` |
 
 Hosted-agent principal and backend values are deployment wiring.
 
@@ -38,47 +38,23 @@ provisioning when a setting must persist.
 
 ### `foundry-agent-ingress-policy.xml`
 
-The policy is attached to the hosted-agent API. It rate-limits requests by
+The policy is attached to the hosted-agent API. The hosted agent points
+`FoundryChatClient` at the project-compatible APIM endpoint and uses the model
+deployment name directly. The policy rate-limits requests by
 source IP, validates a Microsoft Entra bearer token for the
-`https://ai.azure.com` audience, and forwards the request to Foundry without
-adding a custom end-user identity header. The hosted runtime reads Foundry's
+`https://ai.azure.com` audience, and forwards the request to Foundry. The hosted runtime reads Foundry's
 platform-provided `user_id_key`, hashes it as `platform/<sha256>`, and sends
-that derived key only on its downstream APIM model request.
+that derived key on its downstream APIM model request.
 
 The separate `foundry-agent-content-safety-policy.xml` operation policy applies
-`llm-content-safety` to inbound and non-streaming outbound content. Streaming
-SSE output bypasses outbound scanning. The four harm thresholds and Prompt Shield
+`llm-content-safety` to inbound and non-streaming outbound content. The four harm thresholds and Prompt Shield
 setting come from the five `policy-content-safety-*` named values. The ingress policy uses `policy-agent-rate-limit-requests` and
 `policy-agent-rate-limit-window-seconds`. The tenant ID is embedded by Bicep.
-Neither policy detects or redacts PII.
 
 The agent rate-limit counter key includes the configured request count and
 renewal window. Changing either named value starts a fresh counter namespace.
 
 ## Model policies
-
-### Portal subscription-key API
-
-APIM validates the Product subscription key before policy execution. A minimal
-inline API policy selects the managed-identity Foundry backend; no separate XML
-policy or aggregate token policy is deployed.
-
-The API definition matches the Foundry portal-generated shape:
-
-- `subscriptionRequired: true`
-- subscription key header: `api-key`
-- subscription key query parameter: `subscription-key`
-- wildcard operations for the Foundry project model paths
-- managed-identity backend authentication to `https://ai.azure.com/`
-- an active Product-scoped subscription whose name matches the Product
-
-Callers send an APIM Product subscription key, not a Foundry model key:
-
-```http
-POST https://<apim>.azure-api.net/<account>/api/projects/<project>/openai/v1/responses
-api-key: <APIM subscription primary-or-secondary key>
-Content-Type: application/json
-```
 
 ### Hosted-agent model policy
 
@@ -90,11 +66,15 @@ for the `https://ai.azure.com` audience, includes
 `foundry-model-user-level-policy.xml` to validate `x-client-end-user-key`, and
 selects the project-compatible Foundry backend.
 
-Before quota enforcement, `foundry-model-content-safety-policy.xml` applies
-`llm-content-safety` directly to the original Responses request and blocks the
-configured harm severities without mutating the backend payload.
+Before quota enforcement, `foundry-model-content-safety-policy.xml` stores the
+original model request, serializes its `input` property, and applies
+`llm-content-safety` to the first 10,000 characters. It then restores the
+original request for quota enforcement and backend forwarding.
+Prompt Shield uses the shared named value at this model boundary, and all four
+harm categories use the shared threshold named values, which default to `7`.
+Agent ingress and model policies enable Prompt Shield.
 
-The API exposes only:
+The API operation is:
 
 - `POST /api/projects/{projectName}/openai/v1/responses`
 
@@ -112,10 +92,11 @@ limit starts with a fresh counter.
 
 ### `foundry-tool-learn-mcp-policy.xml`
 
-The Microsoft Learn MCP policy configures CORS, rate-limits by APIM subscription
-ID when present, and otherwise uses the caller IP. It includes the shared
+The Microsoft Learn MCP policy rate-limits by APIM subscription ID when present,
+and otherwise uses the caller IP. It includes the shared
 `foundry-tool-content-safety` fragment for inbound and outbound traffic. It uses
-`policy-tool-rate-limit-requests` and `policy-tool-rate-limit-window-seconds`.
+`policy-tool-rate-limit-requests` and
+`policy-tool-rate-limit-window-seconds`.
 The counter key includes both configured values, so changing either one starts
 a fresh counter namespace.
 
@@ -151,13 +132,12 @@ The azd value below flows through Bicep into an APIM named value:
 
 `infra/apim.parameters.json` supplies an empty string when
 `GITHUB_BLOCKED_TOOL_NAMES` is missing. Bicep converts it to the sentinel
-`__none__`, which cannot match a normal tool name. An
+`__none__`, which represents an empty denylist. An
 `azd provision --no-prompt` run recreates these values from the azd environment,
-so manual APIM portal changes are not durable configuration.
+with Bicep and azd as the configuration source of truth.
 
 The exact-tool denylist is enforced by APIM before forwarding the call. Run
-`azd provision --no-prompt` after changing the azd value. Provisioning is also
-required after a manual portal edit because Bicep remains the source of truth.
+`azd provision --no-prompt` after changing the azd value.
 
 #### Configuration examples
 
@@ -170,8 +150,7 @@ azd env set GITHUB_BLOCKED_TOOL_NAMES 'get_me,delete_file'
 azd provision --no-prompt
 ```
 
-Tool names must match the `name` values returned by MCP `tools/list`; display
-labels are not used.
+Configure tool names with the `name` values returned by MCP `tools/list`.
 
 The GitHub connection requests the `offline_access`, `repo`, and `read:user`
 OAuth scopes. Actual access is limited by those scopes and the permissions of
@@ -181,13 +160,5 @@ to public and private repositories.
 ### `foundry-tool-content-safety-policy.xml`
 
 This reusable fragment is included by both MCP APIs. It applies the four harm
-category thresholds and Prompt Shield configured by the five
-`policy-content-safety-*` named values. Prompt Shield may reject benign agent
-instructions. The fragment does not detect or redact PII.
-
-## Deployment behavior
-
-Azure Resource Manager deployments are incremental. Removing optional GitHub
-credentials later does not delete GitHub resources or toolbox versions that
-were already created. A clean environment without both GitHub OAuth values
-skips creation of the GitHub connection and its APIM resources.
+category thresholds configured by the `policy-content-safety-*-threshold` named
+values.

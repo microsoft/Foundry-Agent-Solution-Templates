@@ -13,11 +13,11 @@ It provides:
 
 The sample includes:
 
-- **Three APIM APIs:** a hosted-agent ingress API, a direct hosted-agent model API, and governed MCP tool APIs for Microsoft Learn and GitHub;
-- **Agent ingress policies:** rate-limit requests by source IP, validate Microsoft Entra ID bearer tokens for the `https://ai.azure.com` audience, and forward requests to Foundry without adding a custom user header. The `/responses` operation retains generic inbound safety and non-streaming outbound harm filtering; the model gateway performs the explicit Responses prompt extraction and harmful-content check;
+- **APIM APIs:** a hosted-agent ingress API, a direct hosted-agent model API, and governed MCP tool APIs for Microsoft Learn and GitHub;
+- **Agent ingress policies:** apply authentication, rate limiting, and inbound and outbound Content Safety;
 - **Model gateway policies:** authenticate the hosted agent, enforce harmful-content checks and per-user token limits, and route Responses requests to Foundry with managed identity;
-- **Microsoft Learn MCP policies:** provide CORS, per-caller rate limiting, and
-  inbound and outbound harm-category filtering with Prompt Shield enabled;
+- **Microsoft Learn MCP policies:** provide per-caller rate limiting and inbound
+  and outbound harm-category filtering;
 - **GitHub MCP policies:** validate GitHub OAuth, enforce user and tool denylists,
   rate-limit callers, and apply shared Content Safety checks.
 
@@ -36,8 +36,8 @@ You need:
 - **Foundry User** at the subscription scope, or on the new Foundry resource
   before deploying and invoking the agent. **Foundry Owner** is not required;
 - Permission and available quota to deploy and use a model in Microsoft Foundry.
-  The example configuration uses `gpt-5.6-luna` version `2026-07-09` with one
-  Data Zone Standard capacity unit.
+  The example configuration uses `gpt-5.6-luna` version `2026-07-09` with 100
+  Data Zone Standard capacity units.
 
 Sign in to both CLIs with the same tenant:
 
@@ -83,9 +83,6 @@ azd env select $environmentName
 > the initial callback URL to `https://localhost`. Generate a client secret,
 > then use its client ID and secret in the commands above. Step 5 replaces the
 > temporary callback with the connection's generated redirect URL.
-
-GitHub individual-tool controls are documented in
-[APIM Policy Reference](APIM-POLICIES.md#github-tool-controls).
 
 ### 3. Provision infrastructure and connections
 
@@ -152,12 +149,6 @@ $body | curl.exe --request POST $agentGateway `
   --data-binary '@-'
 ```
 
-The hosted agent points `FoundryChatClient` at the project-compatible APIM
-endpoint and uses the deployment name directly. The runtime requires Foundry's
-platform-provided `user_id_key`; middleware hashes it into the trusted
-`x-client-end-user-key` sent only to the APIM model endpoint. The model API
-policy applies a separate token counter for each platform user identity.
-
 If the agent contains an OAuth MCP, the first request that uses it returns an
 `oauth_consent_request` with a one-time consent URL. Open that URL, authorize
 the OAuth app, and repeat the request. Foundry stores and injects the user's
@@ -183,14 +174,14 @@ configuration.
 
 | Policy XML | APIM scope and purpose | Named values (default) |
 | --- | --- | --- |
-| `foundry-agent-ingress-policy.xml` | Agent API: validate the bearer token and rate-limit by source IP; no custom user header is added | <ul><li>`policy-agent-rate-limit-requests` (`60`)</li><li>`policy-agent-rate-limit-window-seconds` (`60`)</li></ul> |
+| `foundry-agent-ingress-policy.xml` | Agent API: bearer-token validation and source-IP rate limiting | <ul><li>`policy-agent-rate-limit-requests` (`60`)</li><li>`policy-agent-rate-limit-window-seconds` (`60`)</li></ul> |
 | `foundry-agent-content-safety-policy.xml` | Agent `/responses` operation: generic inbound safety and non-streaming outbound harm filtering | <ul><li>Five shared `policy-content-safety-*` values</li></ul> |
 | `foundry-model-gateway-policy.xml` | Direct hosted-agent model API: authorize the hosted identity, apply model safety and per-user quota fragments, and select the Foundry project backend | <ul><li>`foundry-agent-principal-id` plus two user-limit values through the quota fragment</li></ul> |
-| `foundry-model-content-safety-policy.xml` | Apply Content Safety to the model Responses request | <ul><li>Five shared `policy-content-safety-*` values</li></ul> |
-| `foundry-model-user-level-policy.xml` | Validate `x-client-end-user-key` and enforce its per-user token counter | <ul><li>`policy-user-tokens-per-minute` (`1000`)</li><li>`policy-user-token-quota-per-hour` (`100`)</li></ul> |
-| `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API: CORS, per-caller rate limiting, and the shared Content Safety fragment | <ul><li>`policy-tool-rate-limit-requests` (`60`)</li><li>`policy-tool-rate-limit-window-seconds` (`60`)</li><li>Five shared Content Safety values through the fragment</li></ul> |
-| `foundry-tool-github-mcp-policy.xml` | GitHub MCP API: validate GitHub OAuth, apply the username/tool denylists, rate-limit by GitHub user ID, and include the shared Content Safety fragment | <ul><li>`policy-github-blocked-users` (`__none__`)</li><li>`policy-github-blocked-tools` (`__none__`)</li><li>`policy-tool-rate-limit-requests` (`60`)</li><li>`policy-tool-rate-limit-window-seconds` (`60`)</li><li>Five shared Content Safety values through the fragment</li></ul> |
-| `foundry-tool-content-safety-policy.xml` | Shared MCP policy fragment: harm-category filtering and Prompt Shield | <ul><li>`policy-content-safety-hate-threshold` (`4`)</li><li>`policy-content-safety-self-harm-threshold` (`4`)</li><li>`policy-content-safety-sexual-threshold` (`4`)</li><li>`policy-content-safety-violence-threshold` (`4`)</li><li>`policy-content-safety-prompt-shield-enabled` (`true`)</li></ul> |
+| `foundry-model-content-safety-policy.xml` | Model Responses requests: Content Safety and Prompt Shield | <ul><li>Five shared `policy-content-safety-*` values</li></ul> |
+| `foundry-model-user-level-policy.xml` | Validate `x-client-end-user-key` and enforce its per-user token counter | <ul><li>`policy-user-tokens-per-minute` (`100000`)</li><li>`policy-user-token-quota-per-hour` (`6000000`)</li></ul> |
+| `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API: per-caller rate limiting and shared Content Safety | <ul><li>`policy-tool-rate-limit-requests` (`60`)</li><li>`policy-tool-rate-limit-window-seconds` (`60`)</li><li>Four shared harm thresholds through the fragment</li></ul> |
+| `foundry-tool-github-mcp-policy.xml` | GitHub MCP API: validate GitHub OAuth, apply the username/tool denylists, rate-limit by GitHub user ID, and include the shared Content Safety fragment | <ul><li>`policy-github-blocked-users` (`__none__`)</li><li>`policy-github-blocked-tools` (`__none__`)</li><li>`policy-tool-rate-limit-requests` (`60`)</li><li>`policy-tool-rate-limit-window-seconds` (`60`)</li><li>Four shared harm thresholds through the fragment</li></ul> |
+| `foundry-tool-content-safety-policy.xml` | Shared MCP policy fragment: harm-category filtering | <ul><li>`policy-content-safety-hate-threshold` (`7`)</li><li>`policy-content-safety-self-harm-threshold` (`7`)</li><li>`policy-content-safety-sexual-threshold` (`7`)</li><li>`policy-content-safety-violence-threshold` (`7`)</li></ul> |
 
 For request flow, counter keys, managed-identity trust, OAuth scopes, Content Safety behavior, and
 deployment details for every policy, see [APIM Policy Reference](APIM-POLICIES.md).
@@ -237,8 +228,8 @@ in `infra/apim.parameters.json` aligned.
 
 ### Provisioning fails with `InsufficientQuota`
 
-The example model configuration requests one `gpt-5.6-luna` Data Zone Standard
-capacity unit. The failure can come from either the Foundry account-count quota
+The example model configuration requests 100 `gpt-5.6-luna` Data Zone Standard
+capacity units. The failure can come from either the Foundry account-count quota
 or the model quota. Inspect both in the selected environment region:
 
 ```powershell
@@ -283,10 +274,10 @@ agent uses the `/ai-gateway/api/projects/<project>` endpoint. Run
 ### Model calls return HTTP 403
 
 `Quota Exceeded` means the per-user hourly quota is consumed. The default
-`policy-user-token-quota-per-hour` value is `100`, which is intentionally small
-and can be consumed by one model call. Changing the TPM or hourly quota named
-value creates a new counter key and starts a fresh counter. `Blocked by Content
-Safety` means the model harmful-content policy rejected the prompt.
+`policy-user-token-quota-per-hour` value is `6000000`. Changing the TPM or hourly
+quota named value creates a new counter key and starts a fresh counter.
+`Blocked by Content Safety` means the model harmful-content policy rejected the
+prompt.
 
 ## Cleanup
 

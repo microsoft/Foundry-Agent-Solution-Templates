@@ -34,11 +34,11 @@ param modelDeploymentName string
 
 @minValue(1)
 @description('Maximum prompt and completion tokens allowed per minute for each end user.')
-param modelUserTokensPerMinute int = 1000
+param modelUserTokensPerMinute int = 100000
 
 @minValue(1)
 @description('Maximum prompt and completion tokens allowed per hour for each end user.')
-param modelUserTokenQuotaPerHour int = 100
+param modelUserTokenQuotaPerHour int = 6000000
 
 @minValue(1)
 @description('Maximum requests to governed tool routes during each renewal period.')
@@ -73,16 +73,16 @@ param githubBlockedToolNames string = ''
 
 @minValue(0)
 @maxValue(7)
-param contentSafetyHateThreshold int = 4
+param contentSafetyHateThreshold int = 7
 @minValue(0)
 @maxValue(7)
-param contentSafetySelfHarmThreshold int = 4
+param contentSafetySelfHarmThreshold int = 7
 @minValue(0)
 @maxValue(7)
-param contentSafetySexualThreshold int = 4
+param contentSafetySexualThreshold int = 7
 @minValue(0)
 @maxValue(7)
-param contentSafetyViolenceThreshold int = 4
+param contentSafetyViolenceThreshold int = 7
 param contentSafetyPromptShieldEnabled bool = true
 
 var cognitiveServicesUserRoleDefinitionId = subscriptionResourceId(
