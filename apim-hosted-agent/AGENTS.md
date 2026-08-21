@@ -26,8 +26,9 @@ API, and MCP tools are exposed through APIM tool APIs.
   Safety, OAuth, and tool-governance policies
 - `scripts/` — postprovision link synchronization and postdeploy hosted-agent
   identity binding
-- `APIM-POLICIES.md` — policy behavior, counter keys, trust boundaries, and
+- `docs/apim-policies.md` — policy behavior, counter keys, trust boundaries, and
   configuration reference
+- `docs/cost.md` — cost components, estimate inputs, and cost guardrails
 
 ## Preserve these invariants
 

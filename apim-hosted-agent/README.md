@@ -7,6 +7,26 @@ It provides:
 - **Tool permission policy**: Applies governed MCP policies and optional GitHub user and tool denylists.
 - **AI content safety**: Explicitly blocks harmful Responses model prompts and applies shared safety policies to agent and MCP boundaries.
 
+## What this template is for
+
+- Learn and review an APIM-governed Microsoft Foundry Hosted Agent architecture.
+- Deploy a working agent, model gateway, and governed MCP routes through Bicep
+  and azd.
+- Validate Microsoft Entra authentication, managed-identity backend access, TLS
+  validation, rate limits, per-user token limits, Content Safety, Prompt Shield,
+  OAuth, and tool denylists.
+- Provide a starting point for an adopter-specific AI gateway design.
+
+## What this template is not for
+
+This template is not the Prompt Agent AI gateway or bring-your-own-model (BYOM)
+workflow documented by Microsoft Foundry. It does not create an admin-connected
+model for a declarative Prompt Agent. It deploys a custom Python Hosted Agent
+whose model and MCP traffic is governed by template-owned APIM APIs and
+policies.
+
+Review [Cost planning](docs/cost.md) before provisioning.
+
 ## Architecture
 
 ![End-to-end request flow through API Management policies and Microsoft Foundry](image/flow.png)
@@ -184,7 +204,7 @@ configuration.
 | `foundry-tool-content-safety-policy.xml` | Shared MCP policy fragment: harm-category filtering | <ul><li>`policy-content-safety-hate-threshold` (`7`)</li><li>`policy-content-safety-self-harm-threshold` (`7`)</li><li>`policy-content-safety-sexual-threshold` (`7`)</li><li>`policy-content-safety-violence-threshold` (`7`)</li></ul> |
 
 For request flow, counter keys, managed-identity trust, OAuth scopes, Content Safety behavior, and
-deployment details for every policy, see [APIM Policy Reference](APIM-POLICIES.md).
+deployment details for every policy, see [APIM Policy Reference](docs/apim-policies.md).
 
 ## Current limitations
 
