@@ -101,21 +101,22 @@ azd env select $environmentName
 > **Create the GitHub OAuth App:** In **GitHub Settings > Developer settings >
 > OAuth Apps**, create one app per environment. Use any valid homepage and set
 > the initial callback URL to `https://localhost`. Generate a client secret,
-> then use its client ID and secret in the commands above. Step 5 replaces the
+> then use its client ID and secret in the commands above. Step 4 replaces the
 > temporary callback with the connection's generated redirect URL.
 
-### 3. Provision infrastructure and connections
+### 3. Provision and deploy
 
 ```powershell
-azd provision --no-prompt
+azd up --no-prompt
 ```
 
-Provisioning creates the resource group, Foundry account/project/model, Learn
-connection, RBAC, and APIM service, backends, APIs, policies, named values,
-and resource links. When both GitHub OAuth values are configured, it
-also creates the GitHub APIM resources and Foundry connection. The connections
-are declared in `infra/foundry.bicep`. The postprovision hook canonicalizes
-resource links. Step 4 deploys the toolbox and agent.
+The custom `up` workflow first provisions the resource group, Foundry
+account/project/model, Learn connection, RBAC, and APIM service, backends, APIs,
+policies, named values, and resource links. It then deploys the toolbox and
+hosted agent. When both GitHub OAuth values are configured, provisioning also
+creates the GitHub APIM resources and Foundry connection. The connections are
+declared in `infra/foundry.bicep`, and the postprovision hook canonicalizes
+resource links.
 
 > [!NOTE]
 > To deploy without GitHub, remove the GitHub object from
@@ -123,15 +124,7 @@ resource links. Step 4 deploys the toolbox and agent.
 > `GITHUB_OAUTH_CLIENT_SECRET`. With both values absent or empty, Bicep skips
 > the GitHub connection and its APIM backend, API, and policy.
 
-### 4. Deploy the toolbox and agent
-
-```powershell
-azd deploy --no-prompt
-```
-
-This single command deploys the toolbox and hosted agent.
-
-### 5. Configure the OAuth MCP
+### 4. Configure the OAuth MCP
 
 This sample uses GitHub as the OAuth MCP example. Bicep exports the generated
 redirect URL to the selected azd environment, so retrieve it after provisioning:
@@ -146,7 +139,7 @@ because it does not contain the OAuth `state` parameter.
 
 For deployments without GitHub, skip this step.
 
-### 6. Test the agent
+### 5. Test the agent
 
 Call the governed agent through APIM:
 

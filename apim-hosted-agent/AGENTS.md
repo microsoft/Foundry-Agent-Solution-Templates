@@ -58,9 +58,8 @@ API, and MCP tools are exposed through APIM tool APIs.
 Run commands from `apim-hosted-agent`:
 
 ```powershell
-azd provision --no-prompt # Provision Foundry, APIM, connections, and RBAC
-azd deploy --no-prompt    # Deploy the toolbox and hosted agent
-azd down                  # Remove the environment after reviewing resources
+azd up --no-prompt # Provision infrastructure and deploy the toolbox and agent
+azd down           # Remove the environment after reviewing resources
 ```
 
 Test deployed traffic through
