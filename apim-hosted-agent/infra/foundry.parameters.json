@@ -1,0 +1,23 @@
+{
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "foundryAccountName": {
+      "value": "${AZURE_AI_ACCOUNT_NAME}"
+    },
+    "foundryProjectName": {
+      "value": "${AZURE_AI_PROJECT_NAME}"
+    },
+    "learnMcpUrl": {
+      "value": "${MSLEARN_MCP_URL}"
+    },
+    "githubMcpUrl": {
+      "value": "${GITHUB_MCP_URL}"
+    },
+    "githubOAuthClientId": {
+      "value": "${GITHUB_OAUTH_CLIENT_ID}"
+    },
+    "githubOAuthClientSecret": {
+      "value": "${GITHUB_OAUTH_CLIENT_SECRET}"
+    }
+  }
+}

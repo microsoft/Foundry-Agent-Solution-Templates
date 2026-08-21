@@ -1,0 +1,20 @@
+<fragment>
+  <set-variable name="model-request-body" value="@(context.Request.Body.As&lt;string&gt;(preserveContent: true))" />
+  <set-body>@{
+    var request = JObject.Parse((string)context.Variables["model-request-body"]);
+    var input = request["input"] == null
+      ? ""
+      : request["input"].ToString(Newtonsoft.Json.Formatting.None);
+    var safetyInput = input.Substring(0, Math.Min(input.Length, 10000));
+    return new JObject(new JProperty("input", safetyInput)).ToString(Newtonsoft.Json.Formatting.None);
+  }</set-body>
+  <llm-content-safety backend-id="foundry-content-safety" shield-prompt="{{policy-content-safety-prompt-shield-enabled}}">
+    <categories output-type="EightSeverityLevels">
+      <category name="Hate" threshold="{{policy-content-safety-hate-threshold}}" />
+      <category name="SelfHarm" threshold="{{policy-content-safety-self-harm-threshold}}" />
+      <category name="Sexual" threshold="{{policy-content-safety-sexual-threshold}}" />
+      <category name="Violence" threshold="{{policy-content-safety-violence-threshold}}" />
+    </categories>
+  </llm-content-safety>
+  <set-body>@((string)context.Variables["model-request-body"])</set-body>
+</fragment>
