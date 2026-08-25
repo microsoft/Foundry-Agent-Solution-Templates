@@ -10,6 +10,10 @@ __pycache__/
 htmlcov/
 .vscode/
 .azure/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
 .backups/
 azd-ai-*.log
 ~$*
