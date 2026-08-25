@@ -14,9 +14,12 @@ Do not remove or weaken these controls to simplify development:
 - Hosted Agent egress remains default-deny with only documented dependencies.
 - Managed identities and least-privilege RBAC replace client secrets and keys.
 - Foundry and Search CMK configuration remains enabled.
-- Bicep and azd remain the deployment path.
-- Do not add Terraform, a Dockerfile, a template-owned ACR, or public fallback.
-- Never store the S2S shared key in source, azd state, logs, output, or fixtures.
+- Terraform in `infra-terraform` is the default azd path; Bicep in
+  `infra-bicep` remains a supported companion.
+- Do not add a Dockerfile, a template-owned ACR, or public fallback.
+- Never store the S2S shared key in source, azd state, logs, output, or
+  fixtures. Terraform necessarily records it in ignored local state and
+  generated working files; protect those files as secrets.
 
 ## Replace the sample knowledge
 
@@ -68,12 +71,12 @@ responsible-AI mitigations and testing:
 
 ## Change model or capacity
 
-The model is declared in both `azure.yaml` and Bicep and is validated by
-`scripts/preflight.ps1`. A model change must update:
+The model is declared in `azure.yaml`, `infra-terraform`, and `infra-bicep`, and
+is validated by `scripts/preflight.ps1`. A model change must update:
 
 1. `azure.yaml` deployment name, model name/version, and capacity;
-2. allowed values and defaults in `infra/main.bicep`;
-3. `infra/main.parameters.json`;
+2. allowed values and defaults in `infra-terraform`;
+3. `infra-bicep/main.bicep` and `infra-bicep/main.parameters.json`;
 4. preflight availability and quota checks;
 5. repository contract tests and acceptance prompts;
 6. cost, residency, safety, and model-retirement review.
@@ -101,7 +104,7 @@ After any customization:
 
 1. run unit and repository contract tests;
 2. run `scripts/preflight.ps1`;
-3. preview Bicep changes;
+3. preview changes from the selected Terraform or Bicep implementation;
 4. run management-plane validation;
 5. connect through the configured private access path;
 6. run private data-plane validation and workload-specific tests;

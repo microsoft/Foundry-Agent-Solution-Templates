@@ -2,13 +2,16 @@
 
 Exactly one mode is selected.
 
-The current Bicep uses Azure public-cloud private DNS suffixes. Sovereign-cloud
+The Terraform implementation in `infra-terraform` and Bicep companion in
+`infra-bicep` use Azure public-cloud private DNS suffixes. Sovereign-cloud
 deployment is not supported or validated by this template.
 
 ## Deployment commands
 
 Run one of these commands from the template root after replacing the
 placeholders. These examples use the default source Agent package path.
+They use the default Terraform provider. Add `-InfrastructureProvider Bicep`
+to any command to use the Bicep companion.
 
 ### Point-to-site
 
@@ -48,6 +51,10 @@ Never put the shared key in the command, source, an azd environment, output,
 logs, or a test fixture. For BGP, also pass `-S2sEnableBgp`,
 `-S2sRemoteAsn <asn>`, and
 `-S2sBgpPeeringAddress "<customer-bgp-peer-ipv4>"`.
+
+Terraform records the VPN connection input in its ignored local state and
+generated working files. Treat those files as secrets. The Bicep companion
+keeps the clear-text key out of azd state.
 
 ### VNet peering
 

@@ -1,0 +1,7 @@
+.terraform/
+.terraform-cli/
+.terraform-cli.zip
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log

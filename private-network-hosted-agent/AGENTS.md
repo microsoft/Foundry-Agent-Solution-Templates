@@ -2,16 +2,18 @@
 
 Preserve these invariants:
 
-- Bicep and azd are the only supported deployment path.
+- Terraform and azd are the default deployment path. Bicep remains a supported
+  companion implementation. Keep both implementations behaviorally equivalent.
 - The default Hosted Agent is Python 3.13 source code with `remote_build`.
 - The opt-in ACR scenario consumes only a digest-pinned image from an existing
   enterprise ACR and creates only its Foundry project connection.
-- Public fallback, Dockerfiles, Terraform, template-owned ACR resources, ACR
-  networking, ACR IAM, App Insights, and Log Analytics are out of scope.
+- Public fallback, Dockerfiles, template-owned ACR resources, ACR networking,
+  ACR IAM, App Insights, and Log Analytics are out of scope.
 - Do not weaken `publicNetworkAccess`, local-auth, CMK, private endpoint, or
   least-privilege defaults to make a test pass.
 - Never put a site-to-site shared key in source, azd environment files, output,
-  logs, or test fixtures.
+  logs, or test fixtures. Terraform necessarily records the configured value in
+  its ignored local state and generated working files; treat both as secrets.
 
 Before diagnosing an existing private ACR deployment, read
 `docs/troubleshooting-existing-private-acr.md`. Do not add development-only

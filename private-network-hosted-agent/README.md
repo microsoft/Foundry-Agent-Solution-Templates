@@ -1,8 +1,9 @@
 # Microsoft Foundry private-network Hosted Agent solution template
 
-A Bicep + azd reference implementation for a Python 3.13 Microsoft Foundry
+A Terraform + azd reference implementation for a Python 3.13 Microsoft Foundry
 Hosted Agent that queries Azure AI Search over private connectivity with
-managed identity and citations.
+managed identity and citations. Terraform in `infra-terraform` is the default;
+an equivalent Bicep companion is retained in `infra-bicep`.
 
 The template demonstrates a **private, fail-closed application data plane**.
 Here, *fail closed* means that a failure denies access instead of falling back
@@ -19,7 +20,8 @@ customer-managed keys.
 ## What this template is for
 
 - Learn and review private Foundry Hosted Agent architecture.
-- Deploy a deterministic Search-grounded sample through Bicep and azd.
+- Deploy a deterministic Search-grounded sample through Terraform and azd, or
+  use the supported Bicep companion.
 - Validate private endpoints, DNS, RBAC, CMK, public-access rejection, and Agent
   invocation.
 - Provide a secure starting point for a customer design without weakening
@@ -73,7 +75,7 @@ public dependencies. See [Architecture](docs/architecture.md).
 | `ExistingPrivateAcr` | Subscription ID, ACR resource ID, exact endpoint, digest-pinned image | Existing enterprise private ACR | Complete the selected connectivity and ACR network handoffs; have the ACR owner grant the printed pull role to the Foundry project and Agent identities |
 
 The template always creates a dedicated `rg-<environment-name>` resource group.
-To start or safely resume the default workflow:
+To start or safely resume the default Terraform workflow:
 
 ```powershell
 ./scripts/deploy.ps1 `
@@ -85,6 +87,16 @@ The azd environment stores local deployment state and its target resource group.
 When `-EnvironmentName` is omitted, the script resumes a compatible default
 environment or creates a generated environment and group. For a separate test,
 provide a previously unused `-EnvironmentName`.
+
+To use the Bicep companion instead, add
+`-InfrastructureProvider Bicep` to the same command. Source deployments then use
+`scenarios\bicep` and existing-private-ACR deployments use
+`scenarios\bicep-existing-private-acr`; the Terraform paths are the template
+root and `scenarios\existing-private-acr`, respectively.
+
+Terraform state is local. Keep `*.tfstate*` and `.terraform\` ignored, retain the
+committed `infra-terraform\.terraform.lock.hcl`, and never reuse an environment
+between Terraform and Bicep.
 
 See [Unified deployment](docs/deployment.md) for both commands, ownership,
 preview, resume, VPN, and ACR IAM behavior.

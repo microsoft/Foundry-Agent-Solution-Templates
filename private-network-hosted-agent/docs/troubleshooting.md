@@ -9,21 +9,21 @@ broader RBAC to make a diagnostic pass.
 | Symptom | First action | Continue with |
 |---|---|---|
 | Unified deployment stops at a named stage | Keep the same command, environment name, and group. Fix the reported prerequisite, then rerun; partial resources are retained. | [Safe reruns and failures](deployment.md#safe-reruns-and-failures) |
-| ARM provisioning fails for any resource | Use the printed leaf resource ID, category, UTC time, correlation ID, and next action. Inspect deployment operations and the resource Activity Log; rerun only when the guidance says it is appropriate. | [Safe reruns and failures](deployment.md#safe-reruns-and-failures) |
+| ARM provisioning fails for any resource | For Bicep, use the printed ARM leaf diagnostics. For the default Terraform path, use the Terraform diagnostic and Azure Activity Log. Rerun only when the guidance says it is appropriate. | [Safe reruns and failures](deployment.md#safe-reruns-and-failures) |
 | `-NoPrompt` stops after VPN profile export | Connect the generated resource-scoped profile; noninteractive mode does not bypass private DNS validation. | [VPN handoff](deployment.md#vpn-handoff) |
 | Existing private ACR handoff is incomplete | Give both printed principals, the role, exact registry scope, and repository to the ACR owner, then rerun after propagation. | [Existing private ACR](existing-private-acr.md) |
 | Required provider preflight failure | Register the exact provider namespace reported by `scripts/preflight.ps1`; do not provision yet. | [Register a required resource provider](#register-a-required-resource-provider) |
 | Model, quota, Search region, S2S, or peering preflight failure | Fix the exact prerequisite reported by `scripts/preflight.ps1`; do not provision yet. | [Configuration reference](configuration.md) |
-| Bicep preview shows unexpected deletes or replacements | Stop and verify the selected azd environment, resource group, parameters, and ownership. | [First deployment](deployment.md) |
+| Terraform or Bicep preview shows unexpected deletes or replacements | Stop and verify the selected provider, azd environment, resource group, parameters, and ownership. | [First deployment](deployment.md) |
 | Foundry, Search, or Key Vault resolves publicly or not at all | Keep the configured private access path connected and validate DNS/routing. | [Connectivity, DNS, and routing](connectivity.md) |
 | Managed corporate device resolves a synthetic address or resets private TLS | Compare UDP/TCP DNS and work with the endpoint/network security owner. Do not bypass the security agent locally. | [Enterprise DNS and TLS interception](connectivity.md#enterprise-dns-and-tls-interception) |
-| Private endpoint is missing or unapproved | Inspect the management-plane validation result and Bicep deployment. | [Validation](validation.md) |
+| Private endpoint is missing or unapproved | Inspect the management-plane validation result and selected Terraform or Bicep deployment. | [Validation](validation.md) |
 | Search seeding returns `Forbidden` | Confirm private reachability and bootstrap Search roles; allow RBAC propagation rather than broadening permissions. | [Unified deployment](deployment.md) |
 | Agent cannot query Search | Confirm the dedicated Agent identity has `Search Index Data Reader` and no write roles. | [Security controls](security.md) |
 | Agent invocation returns 403 | Verify both private connectivity and `Foundry Agent Consumer` on the project. | [Invoke-only test](deployment.md#invoke-only-test) |
 | Agent invocation returns 424 `session_not_ready` | Wait 15-30 seconds, retry once, then inspect Agent status and logs. | [Invoke-only test](deployment.md#invoke-only-test) |
 | Agent answer lacks the expected fact or citation | Confirm the sample index exists, contains the expected schema/data, and the Agent can query it. | [Customize the template](customization.md#replace-the-sample-knowledge) |
-| `azd show` says the app is not provisioned after successful Bicep deployment | Use ARM deployment state, azd environment outputs, project coordinates, exact-version validation, and successful invocation as combined evidence. | [Validation](validation.md) |
+| `azd show` says the app is not provisioned after successful infrastructure deployment | Use provider state, azd environment outputs, project coordinates, exact-version validation, and successful invocation as combined evidence. | [Validation](validation.md) |
 | Existing private ACR Agent fails to become active | Run the dedicated fail-closed preflight and query the exact Agent version. | [Private ACR troubleshooting](troubleshooting-existing-private-acr.md) |
 
 ## Register a required resource provider

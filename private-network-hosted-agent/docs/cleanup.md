@@ -29,9 +29,10 @@ Run from the template root with the exact azd environment name:
 ./scripts/cleanup.ps1 -EnvironmentName "<environment-name>"
 ```
 
-The script searches the template-root source project and
-`scenarios\existing-private-acr`. It continues only when exactly one project
-contains that environment. It derives every Azure target from the azd
+The script searches the Terraform projects at the template root and
+`scenarios\existing-private-acr`, plus the Bicep projects at `scenarios\bicep`
+and `scenarios\bicep-existing-private-acr`. It continues only when exactly one
+project contains that environment. It derives every Azure target from the azd
 environment, verifies `rg-<environment-name>` and all three resource-group
 ownership tags, verifies the Foundry account/project and solution VNet IDs, then
 requires the complete resource-group name as confirmation.

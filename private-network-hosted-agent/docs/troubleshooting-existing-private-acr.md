@@ -52,7 +52,8 @@ rejects its OCI v1 manifest.
 
 ## 1. Run the fail-closed preflight
 
-From `scenarios\existing-private-acr` and an approved private path:
+From `scenarios\existing-private-acr` for Terraform, or
+`scenarios\bicep-existing-private-acr` for Bicep, and an approved private path:
 
 ```powershell
 ..\..\scripts\validate-existing-acr.ps1 `

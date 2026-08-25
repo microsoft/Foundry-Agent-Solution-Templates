@@ -10,7 +10,8 @@ Capture:
 
 - repository commit or release;
 - Azure region and connectivity mode;
-- Azure CLI, azd, Bicep, PowerShell, Python, and azd extension versions;
+- selected infrastructure provider and Azure CLI, azd, Terraform or Bicep,
+  PowerShell, Python, and azd extension versions;
 - model deployment name/version/capacity;
 - top-level ARM deployment name;
 - Agent name and immutable version;
@@ -28,7 +29,8 @@ Microsoft documents that each Hosted Agent deployment creates a version; see
    limitations.
 3. Run unit and repository contract tests.
 4. Run preflight against the target subscription and regions.
-5. Preview Bicep changes and review replacements, deletes, and ownership.
+5. Preview changes from the selected Terraform or Bicep implementation and
+   review replacements, deletes, and ownership.
 6. Deploy to a non-production environment through the same private topology.
 7. Run management-plane and private data-plane validation plus workload-specific
    quality, authorization, load, and recovery tests.
@@ -37,8 +39,9 @@ Microsoft documents that each Hosted Agent deployment creates a version; see
 
 ## Model lifecycle
 
-The Bicep sets `NoAutoUpgrade` for the pinned model version. That avoids an
-unreviewed automatic version change but does not prevent model retirement.
+Both `infra-terraform` and `infra-bicep` set `NoAutoUpgrade` for the pinned model
+version. That avoids an unreviewed automatic version change but does not prevent
+model retirement.
 Track current
 [model retirements and upgrades](https://learn.microsoft.com/azure/foundry/openai/concepts/model-retirements)
 and validate a replacement before the retirement date.

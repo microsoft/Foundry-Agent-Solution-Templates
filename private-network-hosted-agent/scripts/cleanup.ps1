@@ -129,21 +129,60 @@ function Resolve-CleanupEnvironment {
     $candidates = @(
         [pscustomobject]@{
             Mode = 'Source'
+            Provider = 'Terraform'
             Directory = $repositoryRoot
         },
         [pscustomobject]@{
             Mode = 'ExistingPrivateAcr'
+            Provider = 'Terraform'
             Directory = Join-Path $repositoryRoot 'scenarios/existing-private-acr'
+        },
+        [pscustomobject]@{
+            Mode = 'Source'
+            Provider = 'Bicep'
+            Directory = Join-Path $repositoryRoot 'scenarios/bicep'
+        },
+        [pscustomobject]@{
+            Mode = 'ExistingPrivateAcr'
+            Provider = 'Bicep'
+            Directory = Join-Path $repositoryRoot 'scenarios/bicep-existing-private-acr'
         }
     )
     $matches = @($candidates | Where-Object {
         $Name -in @(Get-AzdEnvironmentNames -ProjectDirectory $_.Directory)
     })
+    if ($matches.Count -gt 1) {
+        $boundMatches = @($matches | Where-Object {
+            try {
+                $values = Get-CleanupEnvironmentValues `
+                    -ProjectDirectory $_.Directory `
+                    -Name $Name
+                $storedProvider = if (
+                    [string]::IsNullOrWhiteSpace(
+                        [string]$values['FPHA_INFRASTRUCTURE_PROVIDER']
+                    )
+                ) {
+                    'Bicep'
+                }
+                else {
+                    [string]$values['FPHA_INFRASTRUCTURE_PROVIDER']
+                }
+                $values['FPHA_DEPLOYMENT_MODE'] -eq $_.Mode -and
+                    $storedProvider -eq $_.Provider
+            }
+            catch {
+                $false
+            }
+        })
+        if ($boundMatches.Count -eq 1) {
+            $matches = $boundMatches
+        }
+    }
     if ($matches.Count -eq 0) {
-        throw "azd environment '$Name' was not found in the Source or Existing Private ACR project."
+        throw "azd environment '$Name' was not found in any Terraform or Bicep project."
     }
     if ($matches.Count -gt 1) {
-        throw "azd environment '$Name' exists in both project directories. Cleanup refuses the ambiguous target."
+        throw "azd environment '$Name' exists in both project directories or multiple provider scenarios. Cleanup refuses the ambiguous target."
     }
     return $matches[0]
 }

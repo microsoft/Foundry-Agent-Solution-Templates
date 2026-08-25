@@ -4,18 +4,19 @@ Choose the Agent package source and target subscription first. The unified
 orchestrator performs preflight, preview, provisioning, VPN profile export,
 Agent deployment, least-privilege Search access, sample seeding, and acceptance.
 
-| Choice | Required input | What the template owns | Manual handoff |
-|---|---|---|---|
-| `Source` | Subscription ID | Foundry solution and Python 3.13 source Agent built by Foundry with `remote_build` | Complete the selected connectivity handoff; for P2S, connect the exported VPN profile |
-| `ExistingPrivateAcr` | Subscription ID, canonical ACR resource ID, exact login server, digest-pinned image | Foundry solution, Agent, and Foundry `ContainerRegistry` project connection only | Complete the selected connectivity and ACR network handoffs; have the ACR owner grant the printed pull role |
+| Choice | Default Terraform project | Bicep companion project | Required input | What the template owns | Manual handoff |
+|---|---|---|---|---|---|
+| `Source` | Template root (`infra-terraform`) | `scenarios\bicep` (`infra-bicep`) | Subscription ID | Foundry solution and Python 3.13 source Agent built by Foundry with `remote_build` | Complete the selected connectivity handoff; for P2S, connect the exported VPN profile |
+| `ExistingPrivateAcr` | `scenarios\existing-private-acr` (`infra-terraform`) | `scenarios\bicep-existing-private-acr` (`infra-bicep`) | Subscription ID, canonical ACR resource ID, exact login server, digest-pinned image | Foundry solution, Agent, and Foundry `ContainerRegistry` project connection only | Complete the selected connectivity and ACR network handoffs; have the ACR owner grant the printed pull role |
 
 Do not combine the paths. Existing ACR, image, network, DNS, pipeline, and IAM
 remain enterprise-owned.
 
 ## Before running
 
-Install Git, Azure CLI with Bicep, Azure Developer CLI (`azd`), PowerShell 7,
-Python, and Windows Azure VPN Client for the default P2S path. Review
+Install Git, Azure CLI, Terraform, Azure Developer CLI (`azd`), PowerShell 7,
+Python, and Windows Azure VPN Client for the default P2S path. The Bicep
+companion also requires Azure CLI with Bicep. Review
 [Configuration](configuration.md), [Cost planning](cost.md), and
 [Production adoption](production-readiness.md).
 
@@ -50,7 +51,15 @@ From the template root:
   -SubscriptionId "<subscription-id>"
 ```
 
-This is the default path. It does not require Docker or ACR.
+This is the default Terraform path through `infra-terraform`. It does not
+require Docker or ACR. To deploy the equivalent `infra-bicep` implementation,
+add:
+
+```powershell
+  -InfrastructureProvider Bicep
+```
+
+The script then selects `scenarios\bicep`.
 The command uses the default `pointToSite` mode. See
 [Connectivity deployment commands](connectivity.md#deployment-commands) for
 executable `pointToSite`, `siteToSite`, and `vnetPeering` variants.
@@ -68,6 +77,10 @@ Confirm every prerequisite in
   -ContainerRegistryEndpoint "<exact-login-server>" `
   -ContainerImage "<login-server>/<repository>@sha256:<digest>"
 ```
+
+This command defaults to Terraform and selects
+`scenarios\existing-private-acr`. Add `-InfrastructureProvider Bicep` to select
+the `scenarios\bicep-existing-private-acr` companion instead.
 
 The script validates but never changes the external ACR. Provisioning creates
 the Foundry project identity, and the first Agent creation establishes its
@@ -87,8 +100,9 @@ ACR IAM pauses.
 ## Environment and dedicated resource group
 
 `-EnvironmentName` names local azd state under `.azure/`, contributes to resource
-names, and is the only resource-group naming input. The workflow and
-subscription-scope Bicep always derive a dedicated `rg-<environment-name>`.
+names, and is the only resource-group naming input. The workflow and selected
+infrastructure implementation always derive a dedicated
+`rg-<environment-name>`.
 There is no existing-resource-group deployment path.
 
 Once the workflow records an environment's subscription, deployment mode, and
@@ -98,9 +112,15 @@ before invoking any validator, VPN export, provision, or Agent deployment
 command. This prevents a different local default environment from supplying
 resource endpoints to the active deployment.
 
-Subscription-scope Bicep creates the group with exact ownership metadata. The
-deployment workflow never deletes the group, including after failure. Use the
-ordered [cleanup script](cleanup.md) when removing an environment.
+The selected Terraform or Bicep implementation creates the group with exact
+ownership metadata. The deployment workflow never deletes the group, including
+after failure. Use the ordered [cleanup script](cleanup.md) when removing an
+environment.
+
+Terraform uses local state. Keep `.terraform\` and `*.tfstate*` ignored and
+retain `infra-terraform\.terraform.lock.hcl`. Terraform and Bicep environments
+are not interchangeable; use a different environment name when changing
+providers.
 
 Omitting `-EnvironmentName` first checks the local default azd environment. The
 script reuses it only when subscription, deployment mode, expected resource
@@ -164,8 +184,8 @@ before sharing it outside an approved support channel.
 
 After a VPN, ACR IAM, Agent readiness, or RBAC interruption, rerun the same
 command. An explicit `-EnvironmentName` selects that environment; if omitted,
-the compatible default is selected as described above. Bicep reconciliation is
-skipped only when the stored infrastructure fingerprint and live validators
+the compatible default is selected as described above. Infrastructure
+reconciliation is skipped only when the stored fingerprint and live validators
 still match. Otherwise the workflow runs `azd provision`. It never rolls back or
 deletes partial resources.
 
@@ -187,13 +207,13 @@ generated-group ownership ambiguity, and attempted external ACR ownership stop
 the workflow. Policy, quota, capacity, authorization, and region failures are
 not retried by weakening controls.
 
-During `azd provision`, the workflow also polls read-only ARM deployment
-operations and prints the active leaf resource. `[PROGRESS]` marks a stage
-change, while `[WAITING]` identifies the resource or nested deployment that
-Azure Resource Manager is still processing. Progress output intentionally
+For Bicep, during `azd provision`, the workflow also polls read-only ARM
+deployment operations and prints the active leaf resource. `[PROGRESS]` marks a
+stage change, while `[WAITING]` identifies the resource or nested deployment
+that Azure Resource Manager is still processing. Progress output intentionally
 omits elapsed-time and completion-time estimates.
 
-When `azd provision` fails, the workflow reads the reported ARM deployment
+When Bicep `azd provision` fails, the workflow reads the reported ARM deployment
 operations and recursively expands nested deployments. The formatter redacts
 common secret and token patterns, but it prints the leaf resource name and ID,
 type, scope, UTC time, error code, target, message, and a GUID correlation ID
@@ -205,7 +225,9 @@ Unknown errors still produce an actionable fallback covering existing,
 soft-deleted, and `Failed` resources, Azure Portal deployment operations, the
 resource Activity Log, customer troubleshooting, and Azure Support evidence. A
 diagnostic lookup failure is reported separately and never replaces the
-original `azd provision` failure.
+original `azd provision` failure. Terraform failures retain Terraform's own
+diagnostics; the workflow does not apply ARM deployment-operation diagnostics
+to that provider.
 
 Provision failure handling never deletes or directly changes Azure resources.
 When every reported leaf failure is either a Failed Azure Firewall with a

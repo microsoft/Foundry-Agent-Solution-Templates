@@ -50,5 +50,5 @@ services:
             - protocol: responses
               version: 2.0.0
 infra:
-    provider: bicep
-    path: ./infra
+    provider: terraform
+    path: ./infra-terraform
