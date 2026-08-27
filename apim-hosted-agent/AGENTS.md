@@ -22,6 +22,11 @@ API, and MCP tools are exposed through APIM tool APIs.
   GitHub MCP gateways
 - `infra/foundry.bicep` — Foundry project RBAC and Bicep-owned MCP connections
 - `infra/*.parameters.json` — azd parameter mappings for the Bicep layers
+- `azure-terraform.yaml` — alternate azd manifest; rename it to `azure.yaml`
+  when developing or deploying with Terraform
+- `infra-terraform/` — Terraform translation of both Bicep infrastructure layers
+- `infra-terraform/policies/` — Terraform-owned copies of the APIM policy XML;
+  keep them aligned with `infra/policies/`
 - `infra/policies/` — APIM authentication, rate-limit, token-limit, Content
   Safety, OAuth, and tool-governance policies
 - `scripts/` — postprovision link synchronization and postdeploy hosted-agent
@@ -32,9 +37,11 @@ API, and MCP tools are exposed through APIM tool APIs.
 
 ## Preserve these invariants
 
-- Bicep and azd are the supported provisioning and deployment path.
-- Keep `services.project.deployments` in `azure.yaml` aligned with
-  `modelDeploymentName` in `infra/apim.parameters.json`.
+- Bicep and Terraform are parallel azd provisioning paths. Keep their
+  resources, policies, parameters, outputs, and deployment behavior aligned.
+- Keep `services.project.deployments` in each `azure.yaml` aligned with
+  `modelDeploymentName` in `infra/apim.parameters.json` and
+  `model_deployment_name` in `infra-terraform/main.tfvars.json`.
 - Keep the hosted agent's model endpoint on the project-compatible APIM path.
   Do not bypass APIM with a direct Foundry endpoint.
 - Derive per-user model quota keys only from Foundry's platform-provided
@@ -44,11 +51,12 @@ API, and MCP tools are exposed through APIM tool APIs.
 - Keep caller authorization in Foundry RBAC. APIM currently validates and
   forwards the `https://ai.azure.com/` bearer token; it does not replace
   downstream Foundry authorization.
-- Keep MCP connections declared in `infra/foundry.bicep`. GitHub is optional
-  and must remain disabled when both OAuth settings are absent.
+- Keep MCP connections declared in `infra/foundry.bicep` and
+  `infra-terraform/foundry.tf`. GitHub is optional and must remain disabled
+  when both OAuth settings are absent.
 - Treat APIM named values as administrator-facing policy configuration.
-  Persistent default changes belong in Bicep because reprovisioning overwrites
-  manual named-value edits.
+  Persistent default changes belong in both IaC implementations because
+  reprovisioning overwrites manual named-value edits.
 - Do not bypass the configured authentication, identity checks, rate limits,
   token limits, Content Safety, or GitHub user/tool controls to make a test
   pass.
@@ -58,8 +66,7 @@ API, and MCP tools are exposed through APIM tool APIs.
 Run commands from `apim-hosted-agent`:
 
 ```powershell
-azd up --no-prompt # Provision infrastructure and deploy the toolbox and agent
-azd down           # Remove the environment after reviewing resources
+azd up --no-prompt
 ```
 
 Test deployed traffic through

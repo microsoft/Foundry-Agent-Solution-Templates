@@ -11,7 +11,7 @@ It provides:
 
 - Learn and review an APIM-governed Microsoft Foundry Hosted Agent architecture.
 - Deploy a working agent, model gateway, and governed MCP routes through Bicep
-  and azd.
+  or Terraform and azd.
 - Validate Microsoft Entra authentication, managed-identity backend access, TLS
   validation, rate limits, per-user token limits, Content Safety, Prompt Shield,
   OAuth, and tool denylists.
@@ -71,6 +71,22 @@ azd auth login
 Choose a new environment name, subscription, APIM name, and publisher details.
 Use the environment name as the resource-group name.
 
+Before running any `azd` command, select the IaC manifest. Bicep is active by
+default. For Terraform development, temporarily swap the manifests:
+
+```powershell
+Rename-Item azure.yaml azure-bicep.yaml
+Rename-Item azure-terraform.yaml azure.yaml
+```
+
+Run all Terraform `azd` commands while the Terraform manifest is named
+`azure.yaml`. Restore Bicep when finished:
+
+```powershell
+Rename-Item azure.yaml azure-terraform.yaml
+Rename-Item azure-bicep.yaml azure.yaml
+```
+
 ```powershell
 $environmentName = '<environment-name>'
 $subscriptionId = '<subscription-id>'
@@ -106,6 +122,13 @@ azd env select $environmentName
 
 ### 3. Provision and deploy
 
+Choose one infrastructure entry point:
+
+- **Bicep (default):** keep the committed `azure.yaml`.
+- **Terraform:** activate `azure-terraform.yaml` using the rename commands
+  above. Terraform remains beta in `azd` and requires Terraform 1.11 or later
+  plus an Azure CLI sign-in.
+
 ```powershell
 azd up --no-prompt
 ```
@@ -115,19 +138,25 @@ account/project/model, Learn connection, RBAC, and APIM service, backends, APIs,
 policies, named values, and resource links. It then deploys the toolbox and
 hosted agent. When both GitHub OAuth values are configured, provisioning also
 creates the GitHub APIM resources and Foundry connection. The connections are
-declared in `infra/foundry.bicep`, and the postprovision hook canonicalizes
-resource links.
+declared in `infra/foundry.bicep` for Bicep and `infra-terraform/foundry.tf` for
+Terraform. The postprovision hook canonicalizes resource links.
+Each IaC version keeps its policy XML locally under `infra/policies` or
+`infra-terraform/policies`.
 
 > [!NOTE]
 > To deploy without GitHub, remove the GitHub object from
-> `services.tools.tools` and do not set `GITHUB_OAUTH_CLIENT_ID` or
-> `GITHUB_OAUTH_CLIENT_SECRET`. With both values absent or empty, Bicep skips
-> the GitHub connection and its APIM backend, API, and policy.
+> `services.tools.tools` in the selected `azure.yaml` and do not set
+> `GITHUB_OAUTH_CLIENT_ID` or `GITHUB_OAUTH_CLIENT_SECRET`. With both values
+> absent or empty, the selected IaC provider skips the GitHub connection and
+> its APIM backend, API, and policy.
+> Both Bicep and Terraform include the GitHub toolbox entry by default. Set
+> both OAuth values before deploying, or remove the GitHub toolbox object.
 
 ### 4. Configure the OAuth MCP
 
-This sample uses GitHub as the OAuth MCP example. Bicep exports the generated
-redirect URL to the selected azd environment, so retrieve it after provisioning:
+This sample uses GitHub as the OAuth MCP example. The selected IaC provider
+exports the generated redirect URL to the selected azd environment, so retrieve
+it after provisioning:
 
 ```powershell
 azd env get-value GITHUB_OAUTH_REDIRECT_URL
@@ -176,14 +205,15 @@ are included in their counter keys, so changing a configured limit starts a
 fresh counter namespace.
 
 `azd provision --no-prompt` overwrites manual named-value changes. Update the
-corresponding Bicep value before provisioning when a change must persist.
+corresponding Bicep parameter or Terraform variable before provisioning when a
+change must persist.
 
 ## Policy Defaults
 
 APIM exposes exactly 13 administrator-facing named values. Deployment wiring
 such as tenant ID, project managed-identity principal ID, backend ID, project
-name, and model deployment name is embedded by Bicep and is not shown as policy
-configuration.
+name, and model deployment name is embedded by the selected IaC template and is not shown as
+policy configuration.
 
 | Policy XML | APIM scope and purpose | Named values (default) |
 | --- | --- | --- |
@@ -236,8 +266,9 @@ experience.
 
 ### Model deployment configuration does not match
 
-Keep `services.project.deployments` in `azure.yaml` and `modelDeploymentName`
-in `infra/apim.parameters.json` aligned.
+Keep `services.project.deployments` in the selected `azure.yaml` aligned with
+`modelDeploymentName` in `infra/apim.parameters.json` or
+`model_deployment_name` in `infra-terraform/main.tfvars.json`.
 
 ### Provisioning fails with `InsufficientQuota`
 

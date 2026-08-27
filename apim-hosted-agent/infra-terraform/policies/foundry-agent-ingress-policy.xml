@@ -1,0 +1,32 @@
+<policies>
+  <inbound>
+    <base />
+    <rate-limit-by-key
+      calls="{{policy-agent-rate-limit-requests}}"
+      renewal-period="{{policy-agent-rate-limit-window-seconds}}"
+      counter-key='@("ip:" + context.Request.IpAddress + "/calls/{{policy-agent-rate-limit-requests}}/window/{{policy-agent-rate-limit-window-seconds}}")'
+      retry-after-header-name="Retry-After"
+      remaining-calls-header-name="x-agent-calls-remaining" />
+    <validate-azure-ad-token
+      tenant-id="__TENANT_ID__"
+      header-name="Authorization"
+      failed-validation-httpcode="401"
+      failed-validation-error-message="A valid Microsoft Foundry access token is required.">
+      <audiences>
+        <audience>https://ai.azure.com</audience>
+      </audiences>
+    </validate-azure-ad-token>
+    <set-query-parameter name="api-version" exists-action="override">
+      <value>v1</value>
+    </set-query-parameter>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

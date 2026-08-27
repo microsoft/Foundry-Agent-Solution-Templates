@@ -59,14 +59,9 @@ class EndUserIdentityScopedResponsesHostServer(ResponsesHostServer):
             platform_user_id_digest[:12],
         )
 
-        events = await super()._handle_response(request, context, cancellation_signal)
-
-        async def scoped_events() -> AsyncIterator[Any]:
-            token = _current_end_user_identity.set(end_user_identity)
-            try:
-                async for event in events:
-                    yield event
-            finally:
-                _current_end_user_identity.reset(token)
-
-        return scoped_events()
+        token = _current_end_user_identity.set(end_user_identity)
+        try:
+            async for event in super()._handle_response(request, context, cancellation_signal):
+                yield event
+        finally:
+            _current_end_user_identity.reset(token)
