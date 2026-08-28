@@ -5,9 +5,10 @@ Hosted Agent image to an existing Azure Container Registry (ACR). The default
 template-root workflow remains Python 3.13 source deployment with
 `remote_build`.
 
-The Bicep template does not create or configure the ACR, its Private Endpoint,
-Private DNS zone/link, or ACR role assignments. It creates only a managed
-identity `ContainerRegistry` connection under the Foundry project.
+The template does not create or configure the ACR, its Private Endpoint,
+Private DNS zone/link, or ACR role assignments. Both `infra-terraform` and its
+`infra-bicep` companion create only a managed identity `ContainerRegistry`
+connection under the Foundry project.
 
 ## Platform date requirement
 
@@ -57,6 +58,10 @@ Then run from the template root:
   -ContainerRegistryEndpoint "<exact-login-server>" `
   -ContainerImage "<login-server>/<repository>@sha256:<digest>"
 ```
+
+This defaults to Terraform and uses `scenarios\existing-private-acr`. To use the
+Bicep equivalent under `scenarios\bicep-existing-private-acr`, add
+`-InfrastructureProvider Bicep`.
 
 The script owns the workflow; its planned pauses are only for adopter-owned
 actions:
@@ -186,9 +191,10 @@ ACR IAM.
 
 ### Identify the exact resources
 
-Use the environment name printed by the deployment. The Existing Private ACR
-azd environment is under `scenarios\existing-private-acr`, not the template
-root:
+Use the environment name printed by the deployment. The default Terraform
+Existing Private ACR azd environment is under
+`scenarios\existing-private-acr`, not the template root. For the Bicep
+companion, substitute `scenarios\bicep-existing-private-acr` in the commands:
 
 ```powershell
 Set-Location scenarios\existing-private-acr
@@ -415,8 +421,9 @@ foreach ($hostname in $acrHosts) {
 }
 ```
 
-Finally run the template's fail-closed validation from
-`scenarios\existing-private-acr`:
+Finally run the template's fail-closed validation from the selected ACR scenario
+directory (`scenarios\existing-private-acr` for Terraform or
+`scenarios\bicep-existing-private-acr` for Bicep):
 
 ```powershell
 ..\..\scripts\validate-existing-acr.ps1 `
@@ -568,7 +575,9 @@ enterprise ACR or IAM.
 ## Manual/audit scenario configuration
 
 The preferred workflow above is the customer deployment path. Use this
-lower-level flow only for audit or troubleshooting, from the scenario directory:
+lower-level flow only for audit or troubleshooting, from
+`scenarios\existing-private-acr` for Terraform. For Bicep, substitute
+`scenarios\bicep-existing-private-acr`:
 
 ```powershell
 Set-Location scenarios\existing-private-acr

@@ -20,7 +20,8 @@ Use it to:
 - evaluate a private Foundry Hosted Agent architecture in Azure public cloud;
 - demonstrate public-network and local-auth disablement;
 - review managed identity and least-privilege access to Azure AI Search;
-- exercise Bicep and azd provisioning with repeatable security checks;
+- exercise Terraform or companion Bicep provisioning with azd and repeatable
+  security checks;
 - start a customer design that will add its own authorization, data lifecycle,
   reliability, monitoring, and responsible-AI controls.
 
@@ -52,10 +53,10 @@ throughout the documentation.
 
 | Area | Current template boundary |
 |---|---|
-| Cloud | Azure public cloud. The Bicep uses public-cloud private DNS suffixes. |
+| Cloud | Azure public cloud. The Terraform and Bicep implementations use public-cloud private DNS suffixes. |
 | Default deployment | Source deployment with `remote_build` and the Foundry-managed `python_3_13` runtime. Local Python is a separate workstation prerequisite; 3.13 is the documented and tested baseline, while invoke-only clients do not need Python. |
 | Optional deployment | Digest-pinned image from an existing enterprise private ACR. The template does not create or manage that ACR. |
-| Infrastructure | Bicep and azd only. |
+| Infrastructure | Terraform in `infra-terraform` is the default azd path. Bicep in `infra-bicep` is a supported companion. |
 | Connectivity | P2S, S2S, or VNet peering. P2S is the documented default and end-to-end validation path. |
 | Client | Default P2S instructions target Windows Azure VPN Client. macOS needs customer-managed DNS or another approved private path. |
 | Agent behavior | One Search tool, one shared demo index, citations, and Responses protocol 2.0. |

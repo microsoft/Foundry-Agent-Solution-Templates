@@ -4,7 +4,7 @@ requiredVersions:
     extensions:
         azure.ai.agents: '>=1.0.0-beta.7'
         azure.ai.projects: '>=1.0.0-beta.1'
-name: private-network-hosted-agent-existing-private-acr
+name: private-network-hosted-agent-bicep-existing-private-acr
 metadata:
     template: private-network-hosted-agent@v1
 services:
@@ -45,5 +45,5 @@ services:
             - protocol: responses
               version: 2.0.0
 infra:
-    provider: terraform
-    path: ../../infra-terraform
+    provider: bicep
+    path: ../../infra-bicep

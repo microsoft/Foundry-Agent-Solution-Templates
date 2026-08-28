@@ -7,7 +7,7 @@ ROOT = Path(__file__).parents[1]
 def test_only_three_connectivity_modes_are_documented() -> None:
     documentation = (ROOT / "docs/connectivity.md").read_text(encoding="utf-8")
     schema = json.loads(
-        (ROOT / "infra/contract/parameters.schema.json").read_text(
+        (ROOT / "infra-bicep/contract/parameters.schema.json").read_text(
             encoding="utf-8"
         )
     )
@@ -46,12 +46,18 @@ def test_connectivity_examples_use_deployment_script_contract() -> None:
     assert "Remove-Item Env:S2S_SHARED_KEY" in documentation
 
 
-def test_no_terraform_or_dockerfile() -> None:
+def test_terraform_is_scoped_and_dockerfile_is_not_shipped() -> None:
     forbidden = [
         path
         for path in ROOT.rglob("*")
         if path.is_file()
-        and (path.name == "Dockerfile" or path.suffix in {".tf", ".tfvars"})
+        and (
+            path.name == "Dockerfile"
+            or (
+                path.suffix in {".tf", ".tfvars"}
+                and ROOT / "infra-terraform" not in path.parents
+            )
+        )
     ]
     assert forbidden == []
 
@@ -94,10 +100,19 @@ def test_sample_search_data_is_non_sensitive_and_canonical() -> None:
 
 def test_agent_uses_remote_build_and_protocol_two() -> None:
     azure_yaml = (ROOT / "azure.yaml").read_text(encoding="utf-8")
+    assert "name: private-network-hosted-agent\n" in azure_yaml
     assert "runtime: python_3_13" in azure_yaml
     assert "dependencyResolution: remote_build" in azure_yaml
     assert "version: 2.0.0" in azure_yaml
-    assert "provider: bicep" in azure_yaml
+    assert "provider: terraform" in azure_yaml
+    assert "path: ./infra-terraform" in azure_yaml
+
+    bicep_yaml = (ROOT / "scenarios/bicep/azure.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "name: private-network-hosted-agent-bicep\n" in bicep_yaml
+    assert "provider: bicep" in bicep_yaml
+    assert "path: ../../infra-bicep" in bicep_yaml
 
 
 def test_agent_declares_httpx_runtime_dependency() -> None:
@@ -113,10 +128,12 @@ def test_existing_private_acr_scenario_uses_prebuilt_digest_image() -> None:
         ROOT / "scenarios/existing-private-acr/azure.yaml"
     ).read_text(encoding="utf-8")
 
+    assert "name: private-network-hosted-agent-existing-private-acr\n" in scenario
     assert "image: ${AZURE_CONTAINER_IMAGE}" in scenario
     assert "name: private-search-agent-acr" in scenario
     assert "version: 2.0.0" in scenario
-    assert "path: ../../infra" in scenario
+    assert "provider: terraform" in scenario
+    assert "path: ../../infra-terraform" in scenario
     assert "docker:" in scenario
     assert "remoteBuild: true" in scenario
     for forbidden in (
@@ -129,6 +146,16 @@ def test_existing_private_acr_scenario_uses_prebuilt_digest_image() -> None:
         "\n        project:",
     ):
         assert forbidden not in scenario
+
+    bicep_scenario = (
+        ROOT / "scenarios/bicep-existing-private-acr/azure.yaml"
+    ).read_text(encoding="utf-8")
+    assert (
+        "name: private-network-hosted-agent-bicep-existing-private-acr\n"
+        in bicep_scenario
+    )
+    assert "provider: bicep" in bicep_scenario
+    assert "path: ../../infra-bicep" in bicep_scenario
 
 
 def test_p2s_profile_scopes_private_dns() -> None:
@@ -274,15 +301,15 @@ def test_network_validation_handles_non_address_dns_records() -> None:
 
 
 def test_firewall_deployment_uses_staged_modules() -> None:
-    network = (ROOT / "infra/modules/network.bicep").read_text(encoding="utf-8")
-    firewall_base = (ROOT / "infra/modules/firewall-base.bicep").read_text(
+    network = (ROOT / "infra-bicep/modules/network.bicep").read_text(encoding="utf-8")
+    firewall_base = (ROOT / "infra-bicep/modules/firewall-base.bicep").read_text(
         encoding="utf-8"
     )
-    firewall_create = (ROOT / "infra/modules/firewall-create.bicep").read_text(
+    firewall_create = (ROOT / "infra-bicep/modules/firewall-create.bicep").read_text(
         encoding="utf-8"
     )
     attachment = (
-        ROOT / "infra/modules/firewall-policy-attachment.bicep"
+        ROOT / "infra-bicep/modules/firewall-policy-attachment.bicep"
     ).read_text(encoding="utf-8")
 
     assert "module firewallBase './firewall-base.bicep'" in network
@@ -322,10 +349,10 @@ def test_firewall_deployment_uses_staged_modules() -> None:
 
 
 def test_private_dns_control_plane_and_resolver_can_deploy_in_parallel() -> None:
-    solution = (ROOT / "infra/solution.bicep").read_text(encoding="utf-8")
-    zones = (ROOT / "infra/modules/private-dns.bicep").read_text(encoding="utf-8")
+    solution = (ROOT / "infra-bicep/solution.bicep").read_text(encoding="utf-8")
+    zones = (ROOT / "infra-bicep/modules/private-dns.bicep").read_text(encoding="utf-8")
     network = (
-        ROOT / "infra/modules/private-dns-network.bicep"
+        ROOT / "infra-bicep/modules/private-dns-network.bicep"
     ).read_text(encoding="utf-8")
 
     assert "module privateDns './modules/private-dns.bicep'" in solution

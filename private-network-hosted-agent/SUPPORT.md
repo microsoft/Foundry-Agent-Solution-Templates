@@ -21,7 +21,8 @@ before production delivery.
 Run the applicable preflight and validation, then include:
 
 - exact repository commit or release;
-- Azure CLI, azd, Bicep, PowerShell, Python, and azd extension versions;
+- selected infrastructure provider and Azure CLI, azd, Terraform or Bicep,
+  PowerShell, Python, and azd extension versions;
 - sanitized azd environment name, Azure region, connectivity mode, and exact Agent
   version;
 - failing step and sanitized command/error;

@@ -36,7 +36,7 @@ attestation or a workload-specific threat model.
 
 | Party | Responsibility in this solution |
 |---|---|
-| Template | Deploy the documented Bicep topology, fail-closed network/authentication defaults, least-privilege baseline roles, sample Agent, and validation scripts. |
+| Template | Deploy the documented topology through default `infra-terraform` or companion `infra-bicep`, with fail-closed network/authentication defaults, least-privilege baseline roles, sample Agent, and validation scripts. |
 | Microsoft | Operate Azure and Foundry platform capabilities according to current product documentation and contractual terms. |
 | Adopter | Threat model, user/document authorization, data lifecycle, responsible AI, monitoring, incident response, capacity, availability, DR, compliance, and secure customization. |
 
@@ -92,8 +92,9 @@ two public IP resources are unrelated to each other and to the P2S Entra
 authentication flow.
 
 Reviewers should validate the effective Firewall Policy against
-`infra/modules/network.bicep`, confirm public network access remains disabled on
-Foundry, Search, and Key Vault, and retain evidence from
+`infra-terraform/modules/network/main.tf` or the equivalent
+`infra-bicep/modules/network.bicep`, confirm public network access remains disabled
+on Foundry, Search, and Key Vault, and retain evidence from
 `scripts/validate-network.ps1` and `scripts/validate-all.ps1`.
 
 Do not claim that all traffic stays in the VNet, that every platform data store

@@ -2,9 +2,9 @@
 
 requiredVersions:
     extensions:
-        azure.ai.agents: '>=1.0.0-beta.7'
+        azure.ai.agents: '>=1.0.0-beta.4'
         azure.ai.projects: '>=1.0.0-beta.1'
-name: private-network-hosted-agent-existing-private-acr
+name: private-network-hosted-agent-bicep
 metadata:
     template: private-network-hosted-agent@v1
 services:
@@ -19,19 +19,22 @@ services:
               sku:
                 capacity: 10
                 name: Standard
-    private-search-agent-acr:
+    private-search-agent:
+        project: ../../agent/search-agent
         host: azure.ai.agent
+        language: python
         uses:
             - ai-project
-        docker:
-            remoteBuild: true
-        image: ${AZURE_CONTAINER_IMAGE}
+        codeConfiguration:
+            dependencyResolution: remote_build
+            entryPoint: main.py
+            runtime: python_3_13
         container:
             resources:
                 cpu: "0.5"
                 memory: 1Gi
         description: Answers questions from a private, non-sensitive Azure AI Search demo index with stable citations.
-        displayName: Private Search Agent - Existing ACR
+        displayName: Private Search Agent
         environmentVariables:
             - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
               value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
@@ -39,11 +42,13 @@ services:
               value: ${AZURE_SEARCH_ENDPOINT}
             - name: AZURE_SEARCH_INDEX_NAME
               value: ${AZURE_SEARCH_INDEX_NAME}
+            - name: FOUNDRY_LOCAL_DEVELOPMENT
+              value: "false"
         kind: hosted
-        name: private-search-agent-acr
+        name: private-search-agent
         protocols:
             - protocol: responses
               version: 2.0.0
 infra:
-    provider: terraform
-    path: ../../infra-terraform
+    provider: bicep
+    path: ../../infra-bicep

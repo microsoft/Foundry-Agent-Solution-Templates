@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$DeploymentMode = '',
+    [ValidateSet('Terraform', 'Bicep')]
+    [string]$InfrastructureProvider = 'Terraform',
     [string]$SubscriptionId = '',
     [string]$EnvironmentName = '',
     [string]$Location = 'westus3',
@@ -70,7 +72,18 @@ Assert-DeploymentInputs `
 
 $projectDirectory = Get-DeploymentProjectDirectory `
     -RepositoryRoot $repositoryRoot `
-    -DeploymentMode $DeploymentMode
+    -DeploymentMode $DeploymentMode `
+    -InfrastructureProvider $InfrastructureProvider
+if (-not $ValidateInputsOnly -and
+    $InfrastructureProvider -eq 'Bicep' -and
+    $DeploymentMode -eq 'Source') {
+    Import-LegacyBicepEnvironment `
+        -RepositoryRoot $repositoryRoot `
+        -ProjectDirectory $projectDirectory `
+        -EnvironmentName $EnvironmentName `
+        -SubscriptionId $SubscriptionId `
+        -Location $Location
+}
 if ([string]::IsNullOrWhiteSpace($EnvironmentName)) {
     if ($ValidateInputsOnly) {
         $EnvironmentName = New-DeploymentEnvironmentName -DeploymentMode $DeploymentMode
@@ -82,6 +95,7 @@ if ($ValidateInputsOnly) {
         -EnvironmentName $EnvironmentName
     [pscustomobject]@{
         deploymentMode = $DeploymentMode
+        infrastructureProvider = $InfrastructureProvider
         subscriptionId = $SubscriptionId
         environmentName = $EnvironmentName
         resourceGroupName = $ResourceGroupName
@@ -90,7 +104,7 @@ if ($ValidateInputsOnly) {
     return
 }
 
-Ensure-RequiredCommands
+Ensure-RequiredCommands -InfrastructureProvider $InfrastructureProvider
 $account = Ensure-AzureAuthentication `
     -SubscriptionId $SubscriptionId `
     -NoPrompt:$NoPrompt
@@ -98,6 +112,7 @@ $environmentContext = Resolve-AzdEnvironmentContext `
     -ProjectDirectory $projectDirectory `
     -EnvironmentName $EnvironmentName `
     -DeploymentMode $DeploymentMode `
+    -InfrastructureProvider $InfrastructureProvider `
     -SubscriptionId $SubscriptionId
 $EnvironmentName = $environmentContext.Name
 $ResourceGroupName = $environmentContext.ResourceGroupName
@@ -151,6 +166,7 @@ $environmentValues = @{
     S2S_BGP_PEERING_ADDRESS = $S2sBgpPeeringAddress
     REMOTE_VNET_RESOURCE_ID = $RemoteVnetResourceId
     FPHA_DEPLOYMENT_MODE = $DeploymentMode
+    FPHA_INFRASTRUCTURE_PROVIDER = $InfrastructureProvider
 }
 if ($DeploymentMode -eq 'ExistingPrivateAcr') {
     $environmentValues.AZURE_CONTAINER_REGISTRY_RESOURCE_ID = $ContainerRegistryResourceId
@@ -193,6 +209,7 @@ $preflightArguments = @(
     '-SearchLocation', $SearchLocation,
     '-RemoteVnetResourceId', $RemoteVnetResourceId,
     '-DeploymentMode', $DeploymentMode,
+    '-InfrastructureProvider', $InfrastructureProvider,
     '-ProviderValidationJson', ($providerValidation | ConvertTo-Json -Compress -Depth 5),
     '-ResourceGroupExists', $groupExists.ToString().ToLowerInvariant(),
     '-EnvironmentName', $EnvironmentName,
@@ -217,13 +234,15 @@ Invoke-CheckedCommand `
     -FilePath 'pwsh' `
     -Arguments $preflightArguments `
     -WorkingDirectory $projectDirectory `
-    -RedactArgumentIndexes @(18) | Out-Null
+    -RedactArgumentIndexes @(20) | Out-Null
 
-Set-AzdFirewallCreationMode `
-    -ProjectDirectory $projectDirectory `
-    -SubscriptionId $SubscriptionId `
-    -ResourceGroupName $ResourceGroupName `
-    -EnvironmentName $EnvironmentName
+if ($InfrastructureProvider -eq 'Bicep') {
+    Set-AzdFirewallCreationMode `
+        -ProjectDirectory $projectDirectory `
+        -SubscriptionId $SubscriptionId `
+        -ResourceGroupName $ResourceGroupName `
+        -EnvironmentName $EnvironmentName
+}
 $preview = Invoke-CheckedCommand `
     -Stage 'Provision preview' `
     -FilePath 'azd' `
@@ -233,12 +252,14 @@ $preview = Invoke-CheckedCommand `
     -WorkingDirectory $projectDirectory
 Assert-SafeProvisionPreview `
     -PreviewOutput $preview.Output `
-    -DeploymentMode $DeploymentMode
+    -DeploymentMode $DeploymentMode `
+    -InfrastructureProvider $InfrastructureProvider
 
 if ($PreviewOnly) {
     Write-Host '[COMPLETE] Provision preview passed the workflow safety checks.'
     [pscustomobject]@{
         deploymentMode = $DeploymentMode
+        infrastructureProvider = $InfrastructureProvider
         environmentName = $EnvironmentName
         resourceGroupName = $ResourceGroupName
         validation = 'preview-passed'
@@ -259,11 +280,20 @@ if ($infrastructureReady) {
 }
 else {
     try {
-        Invoke-ProvisionWithArmDiagnostics `
-            -ProjectDirectory $projectDirectory `
-            -SubscriptionId $SubscriptionId `
-            -ResourceGroupName $ResourceGroupName `
-            -EnvironmentName $EnvironmentName | Out-Null
+        if ($InfrastructureProvider -eq 'Bicep') {
+            Invoke-ProvisionWithArmDiagnostics `
+                -ProjectDirectory $projectDirectory `
+                -SubscriptionId $SubscriptionId `
+                -ResourceGroupName $ResourceGroupName `
+                -EnvironmentName $EnvironmentName | Out-Null
+        }
+        else {
+            Invoke-TerraformProvisionWithReadinessRetry `
+                -ProjectDirectory $projectDirectory `
+                -SubscriptionId $SubscriptionId `
+                -ResourceGroupName $ResourceGroupName `
+                -EnvironmentName $EnvironmentName | Out-Null
+        }
     }
     catch {
         $nativeExitCode = $_.Exception.Data['NativeExitCode']
@@ -272,6 +302,13 @@ else {
         }
         $Host.UI.WriteErrorLine($_.Exception.Message)
         exit [int]$nativeExitCode
+    }
+    finally {
+        if ($InfrastructureProvider -eq 'Terraform') {
+            Restore-PostAgentNetworkAssociationsBestEffort `
+                -ProjectDirectory $projectDirectory `
+                -EnvironmentName $EnvironmentName
+        }
     }
     Invoke-CheckedCommand `
         -Stage 'Persist infrastructure fingerprint' `
@@ -284,6 +321,10 @@ else {
         -Quiet `
         -RedactArgumentIndexes @(3) | Out-Null
 }
+
+Restore-PostAgentNetworkAssociations `
+    -ProjectDirectory $projectDirectory `
+    -EnvironmentName $EnvironmentName
 
 foreach ($validator in @(
     'validate-infrastructure.ps1',
@@ -385,20 +426,21 @@ $serviceName = if ($DeploymentMode -eq 'Source') {
 else {
     'private-search-agent-acr'
 }
-$agent = $null
-if ($DeploymentMode -eq 'ExistingPrivateAcr') {
-    try {
-        $agent = Get-AgentRecord `
-            -ProjectDirectory $projectDirectory `
-            -EnvironmentName $EnvironmentName `
-            -ServiceName $serviceName
-        Write-Host '[RESUME] Existing Hosted Agent identity found; continuing at the external IAM handoff.'
+try {
+    $agent = $null
+    if ($DeploymentMode -eq 'ExistingPrivateAcr') {
+        try {
+            $agent = Get-AgentRecord `
+                -ProjectDirectory $projectDirectory `
+                -EnvironmentName $EnvironmentName `
+                -ServiceName $serviceName
+            Write-Host '[RESUME] Existing Hosted Agent identity found; continuing at the external IAM handoff.'
+        }
+        catch {
+            $agent = $null
+        }
     }
-    catch {
-        $agent = $null
-    }
-}
-if ($DeploymentMode -eq 'Source' -or $null -eq $agent) {
+    if ($DeploymentMode -eq 'Source' -or $null -eq $agent) {
     $deployArguments = @(
         'deploy', $serviceName, '-e', $EnvironmentName, '--no-prompt'
     )
@@ -450,9 +492,9 @@ if ($DeploymentMode -eq 'Source' -or $null -eq $agent) {
     if ($expectedBootstrapAuthorizationFailure) {
         Write-Host '[INFO] The expected ACR authorization boundary was reached and the stable Hosted Agent identity was created.'
     }
-}
-$agentPrincipalId = Get-AgentPrincipalId -Agent $agent
-Invoke-CheckedCommand `
+    }
+    $agentPrincipalId = Get-AgentPrincipalId -Agent $agent
+    Invoke-CheckedCommand `
     -Stage 'Persist Agent principal ID' `
     -FilePath 'azd' `
     -Arguments @(
@@ -463,8 +505,8 @@ Invoke-CheckedCommand `
     -Quiet `
     -RedactArgumentIndexes @(3) | Out-Null
 
-$projectPrincipalId = ''
-if ($DeploymentMode -eq 'ExistingPrivateAcr') {
+    $projectPrincipalId = ''
+    if ($DeploymentMode -eq 'ExistingPrivateAcr') {
     $identityValues = Get-AzdEnvironmentValues `
         -ProjectDirectory $projectDirectory `
         -EnvironmentName $EnvironmentName
@@ -525,39 +567,49 @@ if ($DeploymentMode -eq 'ExistingPrivateAcr') {
             'deploy', $serviceName, '-e', $EnvironmentName, '--no-prompt'
         ) `
         -WorkingDirectory $projectDirectory | Out-Null
-}
+    }
 
-$deployedValues = Get-AzdEnvironmentValues `
+    $deployedValues = Get-AzdEnvironmentValues `
     -ProjectDirectory $projectDirectory `
     -EnvironmentName $EnvironmentName
-$versionKey = if ($DeploymentMode -eq 'Source') {
+    $versionKey = if ($DeploymentMode -eq 'Source') {
     'AGENT_PRIVATE_SEARCH_AGENT_VERSION'
 }
 else {
     'AGENT_PRIVATE_SEARCH_AGENT_ACR_VERSION'
-}
-$expectedVersion = $deployedValues[$versionKey]
-$agent = Wait-ForAgentActive `
+    }
+    $expectedVersion = $deployedValues[$versionKey]
+    $agent = Wait-ForAgentActive `
     -ProjectDirectory $projectDirectory `
     -EnvironmentName $EnvironmentName `
     -ServiceName $serviceName `
     -ExpectedVersion $expectedVersion
-$liveVersionProperty = $agent.PSObject.Properties['version']
-$liveVersion = if ($null -ne $liveVersionProperty) {
+    $liveVersionProperty = $agent.PSObject.Properties['version']
+    $liveVersion = if ($null -ne $liveVersionProperty) {
     [string]$liveVersionProperty.Value
-}
-else {
+    }
+    else {
     ''
-}
-if ([string]::IsNullOrWhiteSpace($liveVersion)) {
+    }
+    if ([string]::IsNullOrWhiteSpace($liveVersion)) {
     throw "Hosted Agent '$serviceName' did not report an exact active version."
-}
-if ([string]::IsNullOrWhiteSpace($expectedVersion)) {
+    }
+    if ([string]::IsNullOrWhiteSpace($expectedVersion)) {
     $expectedVersion = $liveVersion
-}
-elseif ($liveVersion -ne [string]$expectedVersion) {
+    }
+    elseif ($liveVersion -ne [string]$expectedVersion) {
     throw "Hosted Agent '$serviceName' is active at version '$liveVersion', not expected version '$expectedVersion'."
+    }
 }
+finally {
+    Restore-PostAgentNetworkAssociationsBestEffort `
+        -ProjectDirectory $projectDirectory `
+        -EnvironmentName $EnvironmentName
+}
+
+Restore-PostAgentNetworkAssociations `
+    -ProjectDirectory $projectDirectory `
+    -EnvironmentName $EnvironmentName
 
 Invoke-CheckedCommand `
     -Stage 'Assign query-only Search access' `
@@ -628,6 +680,7 @@ Write-Host '[NEXT] Invoke the validated Hosted Agent from any PowerShell directo
 Write-Host $invokeCommand
 [pscustomobject]@{
     deploymentMode = $DeploymentMode
+    infrastructureProvider = $InfrastructureProvider
     environmentName = $EnvironmentName
     resourceGroupName = $ResourceGroupName
     agentService = $serviceName

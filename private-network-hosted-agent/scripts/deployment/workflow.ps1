@@ -3,12 +3,92 @@ Set-StrictMode -Version Latest
 function Get-DeploymentProjectDirectory {
     param(
         [string]$RepositoryRoot,
-        [string]$DeploymentMode
+        [string]$DeploymentMode,
+        [ValidateSet('Terraform', 'Bicep')]
+        [string]$InfrastructureProvider = 'Terraform'
     )
+    if ($InfrastructureProvider -eq 'Bicep') {
+        if ($DeploymentMode -eq 'ExistingPrivateAcr') {
+            return Join-Path $RepositoryRoot 'scenarios/bicep-existing-private-acr'
+        }
+        return Join-Path $RepositoryRoot 'scenarios/bicep'
+    }
     if ($DeploymentMode -eq 'ExistingPrivateAcr') {
         return Join-Path $RepositoryRoot 'scenarios/existing-private-acr'
     }
     return $RepositoryRoot
+}
+
+function Import-LegacyBicepEnvironment {
+    param(
+        [string]$RepositoryRoot,
+        [string]$ProjectDirectory,
+        [string]$EnvironmentName,
+        [string]$SubscriptionId,
+        [string]$Location
+    )
+
+    if ([string]::IsNullOrWhiteSpace($EnvironmentName) -or
+        $ProjectDirectory -eq $RepositoryRoot) {
+        return
+    }
+    if ($EnvironmentName -in @(
+            Get-AzdEnvironmentNames -ProjectDirectory $ProjectDirectory
+        )) {
+        return
+    }
+    if ($EnvironmentName -notin @(
+            Get-AzdEnvironmentNames -ProjectDirectory $RepositoryRoot
+        )) {
+        return
+    }
+
+    $legacyValues = Get-AzdEnvironmentValues `
+        -ProjectDirectory $RepositoryRoot `
+        -EnvironmentName $EnvironmentName
+    $storedProvider = [string]$legacyValues['FPHA_INFRASTRUCTURE_PROVIDER']
+    if (-not [string]::IsNullOrWhiteSpace($storedProvider) -and
+        $storedProvider -ne 'Bicep') {
+        return
+    }
+    if ($legacyValues['FPHA_DEPLOYMENT_MODE'] -ne 'Source') {
+        return
+    }
+    if ($legacyValues['AZURE_SUBSCRIPTION_ID'] -ne $SubscriptionId) {
+        throw "Legacy Bicep environment '$EnvironmentName' targets a different subscription."
+    }
+
+    Invoke-CheckedCommand `
+        -Stage "Migrate legacy Bicep environment '$EnvironmentName'" `
+        -FilePath 'azd' `
+        -Arguments @(
+            'env', 'new', $EnvironmentName,
+            '--subscription', $SubscriptionId,
+            '--location', $Location,
+            '--no-prompt'
+        ) `
+        -WorkingDirectory $ProjectDirectory | Out-Null
+    foreach ($name in $legacyValues.Keys) {
+        Invoke-CheckedCommand `
+            -Stage "Copy legacy Bicep environment value $name" `
+            -FilePath 'azd' `
+            -Arguments @(
+                'env', 'set', $name, [string]$legacyValues[$name],
+                '-e', $EnvironmentName
+            ) `
+            -WorkingDirectory $ProjectDirectory `
+            -Quiet `
+            -RedactArgumentIndexes @(3) | Out-Null
+    }
+    Invoke-CheckedCommand `
+        -Stage 'Bind migrated environment to Bicep' `
+        -FilePath 'azd' `
+        -Arguments @(
+            'env', 'set', 'FPHA_INFRASTRUCTURE_PROVIDER', 'Bicep',
+            '-e', $EnvironmentName
+        ) `
+        -WorkingDirectory $ProjectDirectory `
+        -Quiet | Out-Null
 }
 
 function Get-AzdEnvironmentValues {
@@ -54,6 +134,7 @@ function Get-ReusableAzdEnvironmentContext {
     param(
         [string]$ProjectDirectory,
         [string]$DeploymentMode,
+        [string]$InfrastructureProvider = 'Bicep',
         [string]$SubscriptionId,
         [string[]]$EnvironmentNames
     )
@@ -84,7 +165,16 @@ function Get-ReusableAzdEnvironmentContext {
     }
     $expectedResourceGroup = Get-GeneratedResourceGroupName `
         -EnvironmentName $nameProperty.Value
+    $storedInfrastructureProvider = if (
+        [string]::IsNullOrWhiteSpace($values['FPHA_INFRASTRUCTURE_PROVIDER'])
+    ) {
+        'Bicep'
+    }
+    else {
+        $values['FPHA_INFRASTRUCTURE_PROVIDER']
+    }
     if ($values['FPHA_DEPLOYMENT_MODE'] -eq $DeploymentMode -and
+        $storedInfrastructureProvider -eq $InfrastructureProvider -and
         $values['AZURE_SUBSCRIPTION_ID'] -eq $SubscriptionId -and
         $values['AZURE_RESOURCE_GROUP'] -eq $expectedResourceGroup) {
         return [pscustomobject]@{
@@ -100,6 +190,7 @@ function Assert-AzdEnvironmentBinding {
         [string]$ProjectDirectory,
         [string]$EnvironmentName,
         [string]$DeploymentMode,
+        [string]$InfrastructureProvider = 'Bicep',
         [string]$SubscriptionId,
         [string]$ResourceGroupName,
         [string[]]$EnvironmentNames,
@@ -137,6 +228,17 @@ function Assert-AzdEnvironmentBinding {
     if (-not $hasExistingBinding) {
         return $values
     }
+    $storedInfrastructureProvider = if (
+        [string]::IsNullOrWhiteSpace($values['FPHA_INFRASTRUCTURE_PROVIDER'])
+    ) {
+        'Bicep'
+    }
+    else {
+        $values['FPHA_INFRASTRUCTURE_PROVIDER']
+    }
+    if ($storedInfrastructureProvider -ne $InfrastructureProvider) {
+        throw "azd environment '$EnvironmentName' is already bound to infrastructure provider '$storedInfrastructureProvider'."
+    }
 
     foreach ($name in $binding.Keys) {
         if (-not $values.ContainsKey($name) -or
@@ -152,6 +254,7 @@ function Resolve-AzdEnvironmentContext {
         [string]$ProjectDirectory,
         [string]$EnvironmentName,
         [string]$DeploymentMode,
+        [string]$InfrastructureProvider = 'Bicep',
         [string]$SubscriptionId
     )
 
@@ -162,6 +265,7 @@ function Resolve-AzdEnvironmentContext {
         $reusable = Get-ReusableAzdEnvironmentContext `
             -ProjectDirectory $ProjectDirectory `
             -DeploymentMode $DeploymentMode `
+            -InfrastructureProvider $InfrastructureProvider `
             -SubscriptionId $SubscriptionId `
             -EnvironmentNames $environmentNames
         if ($null -eq $reusable) {
@@ -180,6 +284,7 @@ function Resolve-AzdEnvironmentContext {
         ProjectDirectory = $ProjectDirectory
         EnvironmentName = $EnvironmentName
         DeploymentMode = $DeploymentMode
+        InfrastructureProvider = $InfrastructureProvider
         SubscriptionId = $SubscriptionId
         ResourceGroupName = $ResourceGroupName
         EnvironmentNames = $environmentNames
@@ -190,6 +295,13 @@ function Resolve-AzdEnvironmentContext {
     $values = Assert-AzdEnvironmentBinding @bindingParameters
     $bindingValidated = $EnvironmentName -in $environmentNames -and
         $values['FPHA_DEPLOYMENT_MODE'] -eq $DeploymentMode -and
+        (
+            $values['FPHA_INFRASTRUCTURE_PROVIDER'] -eq $InfrastructureProvider -or
+            (
+                $InfrastructureProvider -eq 'Bicep' -and
+                [string]::IsNullOrWhiteSpace($values['FPHA_INFRASTRUCTURE_PROVIDER'])
+            )
+        ) -and
         $values['AZURE_SUBSCRIPTION_ID'] -eq $SubscriptionId -and
         $values['AZURE_RESOURCE_GROUP'] -eq $ResourceGroupName
     return [pscustomobject]@{
@@ -221,9 +333,24 @@ function Get-InfrastructureFingerprint {
         [hashtable]$Values
     )
 
+    $infrastructureDirectory = if (
+        (Split-Path $ProjectDirectory -Leaf) -in @('bicep', 'bicep-existing-private-acr')
+    ) {
+        Join-Path $RepositoryRoot 'infra-bicep'
+    }
+    else {
+        Join-Path $RepositoryRoot 'infra-terraform'
+    }
     $paths = @(
-        Get-ChildItem (Join-Path $RepositoryRoot 'infra') -Recurse -File |
-            Where-Object { $_.Extension -in @('.bicep', '.json') }
+        Get-ChildItem $infrastructureDirectory -Recurse -File |
+            Where-Object {
+                $_.FullName -notlike "$infrastructureDirectory\.terraform\*" -and
+                $_.FullName -notlike "$infrastructureDirectory\.terraform-cli\*" -and
+                (
+                    $_.Extension -in @('.bicep', '.json', '.tf') -or
+                    $_.Name -eq '.terraform.lock.hcl'
+                )
+            }
     )
     $projectDefinition = Join-Path $ProjectDirectory 'azure.yaml'
     if (Test-Path $projectDefinition) {
@@ -253,11 +380,141 @@ function Get-StringSha256 {
 }
 
 function Ensure-RequiredCommands {
-    foreach ($command in @('git', 'az', 'azd', 'pwsh', 'python')) {
+    param(
+        [ValidateSet('Terraform', 'Bicep')]
+        [string]$InfrastructureProvider = 'Terraform'
+    )
+    $commands = @('git', 'az', 'azd', 'pwsh', 'python')
+    if ($InfrastructureProvider -eq 'Terraform') {
+        $commands += 'terraform'
+    }
+
+    foreach ($command in $commands) {
         if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
             throw "Required command '$command' is not installed."
         }
     }
+}
+
+function Test-OnlyFoundryPrivateEndpointReadinessRace {
+    param([string]$ProvisionOutput)
+
+    $normalizedOutput = $ProvisionOutput -replace
+        '\x1B\[[0-?]*[ -/]*[@-~]',
+        ''
+    $blocks = @(
+        [regex]::Split(
+            $normalizedOutput,
+            '(?m)^\s*(?:│\s*)?Error:\s*'
+        ) | Select-Object -Skip 1
+    )
+    return $blocks.Count -gt 0 -and
+        @($blocks | Where-Object {
+            $_ -notmatch
+                '(?is)AccountProvisioningStateInvalid.*state Accepted'
+        }).Count -eq 0
+}
+
+function Invoke-TerraformProvisionWithReadinessRetry {
+    param(
+        [string]$ProjectDirectory,
+        [string]$SubscriptionId,
+        [string]$ResourceGroupName,
+        [string]$EnvironmentName,
+        [int]$ReadinessAttempts = 30,
+        [int]$ReadinessDelaySeconds = 10,
+        [int]$ReadinessStabilizationSeconds = 30
+    )
+
+    $provisionArguments = @(
+        'provision', '-e', $EnvironmentName, '--no-prompt'
+    )
+    $provision = Invoke-CheckedCommand `
+        -Stage 'Provision Terraform infrastructure' `
+        -FilePath 'azd' `
+        -Arguments $provisionArguments `
+        -WorkingDirectory $ProjectDirectory `
+        -AllowFailure
+    if ($provision.ExitCode -eq 0) {
+        return $provision
+    }
+    $provisionText = $provision.Output -join "`n"
+    if (-not (Test-OnlyFoundryPrivateEndpointReadinessRace `
+            -ProvisionOutput $provisionText)) {
+        $exception = [Exception]::new(
+            "Stage 'Provision Terraform infrastructure' failed with exit code $($provision.ExitCode). Command: $($provision.Command)"
+        )
+        $exception.Data['NativeExitCode'] = [int]$provision.ExitCode
+        $exception.Data['NativeCommand'] = [string]$provision.Command
+        throw $exception
+    }
+
+    Write-Host '[RETRY] Foundry Private Endpoint validation raced with account provisioning. Waiting for the account to reach Succeeded before one unchanged Terraform retry.'
+    $accountId = ''
+    for ($attempt = 1; $attempt -le $ReadinessAttempts; $attempt++) {
+        $accounts = Invoke-CheckedCommand `
+            -Stage "Inspect Foundry account readiness ($attempt/$ReadinessAttempts)" `
+            -FilePath 'az' `
+            -Arguments @(
+                'cognitiveservices', 'account', 'list',
+                '--subscription', $SubscriptionId,
+                '--resource-group', $ResourceGroupName,
+                '--output', 'json',
+                '--only-show-errors'
+            ) `
+            -Quiet
+        $accountRecords = @($accounts.Output -join "`n" | ConvertFrom-Json)
+        $matches = @($accountRecords | Where-Object {
+            $tagsProperty = $_.PSObject.Properties['tags']
+            $environmentTag = if (
+                $null -ne $tagsProperty -and
+                $null -ne $tagsProperty.Value
+            ) {
+                $tagsProperty.Value.PSObject.Properties['azd-env-name']
+            }
+            else {
+                $null
+            }
+            $_.kind -eq 'AIServices' -and
+                $null -ne $environmentTag -and
+                [string]$environmentTag.Value -eq $EnvironmentName
+        })
+        if ($matches.Count -ne 1) {
+            throw "Expected one template Foundry account while waiting for readiness; found $($matches.Count)."
+        }
+        $accountId = [string]$matches[0].id
+        $state = [string]$matches[0].properties.provisioningState
+        if ($state -eq 'Succeeded') {
+            break
+        }
+        if ($state -eq 'Failed') {
+            throw "Foundry account '$accountId' entered Failed provisioning state."
+        }
+        if ($attempt -eq $ReadinessAttempts) {
+            throw "Foundry account '$accountId' did not reach Succeeded after $ReadinessAttempts readiness checks."
+        }
+        Start-Sleep -Seconds $ReadinessDelaySeconds
+    }
+    if ($ReadinessStabilizationSeconds -gt 0) {
+        Write-Host "[WAITING] Foundry reports Succeeded; allowing $ReadinessStabilizationSeconds seconds for Private Link readiness to propagate."
+        Start-Sleep -Seconds $ReadinessStabilizationSeconds
+    }
+
+    $retry = Invoke-CheckedCommand `
+        -Stage 'Provision Terraform infrastructure retry (1/1)' `
+        -FilePath 'azd' `
+        -Arguments $provisionArguments `
+        -WorkingDirectory $ProjectDirectory `
+        -AllowFailure
+    if ($retry.ExitCode -eq 0) {
+        return $retry
+    }
+    $exception = [Exception]::new(
+        "Stage 'Provision Terraform infrastructure retry (1/1)' failed with exit code $($retry.ExitCode). Command: $($retry.Command)"
+    )
+    $exception.Data['NativeExitCode'] = [int]$retry.ExitCode
+    $exception.Data['NativeCommand'] = [string]$retry.Command
+    throw $exception
 }
 
 function Ensure-AzureAuthentication {
@@ -518,12 +775,15 @@ function Initialize-AzdEnvironment {
 function Assert-SafeProvisionPreview {
     param(
         [string[]]$PreviewOutput,
-        [string]$DeploymentMode
+        [string]$DeploymentMode,
+        [ValidateSet('Terraform', 'Bicep')]
+        [string]$InfrastructureProvider = 'Terraform'
     )
     $preview = $PreviewOutput -join "`n"
     if ($preview -match '(?im)^\s*(Delete|Replace)\s*:' -or
         $preview -match '(?im)^\s*[-!]\s+.*\b(Delete|Replace)\b' -or
-        $preview -match '(?i)\b(to delete|to replace)\b') {
+        $preview -match '(?i)\b(to delete|to replace|will be destroyed|must be replaced)\b' -or
+        $preview -match '(?i)\bPlan:\s*\d+\s+to add,\s*\d+\s+to change,\s*[1-9]\d*\s+to destroy\b') {
         throw 'Provision preview contains a delete or replacement operation.'
     }
     if ($DeploymentMode -eq 'ExistingPrivateAcr' -and
@@ -534,6 +794,11 @@ function Assert-SafeProvisionPreview {
     if ($DeploymentMode -eq 'ExistingPrivateAcr' -and
         $preview -match '(?im)^\s*[+~\-!]\s+.*Microsoft\.Authorization/roleAssignments(?:/|@|\s).*(Container Registry|AcrPull)') {
         throw 'Provision preview attempts to modify enterprise-owned ACR IAM.'
+    }
+    if ($DeploymentMode -eq 'ExistingPrivateAcr' -and
+        $InfrastructureProvider -eq 'Terraform' -and
+        $preview -match '(?i)\bazurerm_container_registry\b') {
+        throw 'Terraform provision preview attempts to manage the enterprise-owned ACR.'
     }
 }
 
@@ -701,6 +966,143 @@ function Get-AcrDnsSuffixes {
         $_ -replace '\.azurecr\.io$', '.privatelink.azurecr.io'
     })
     return @($hosts + $privateHosts | Sort-Object -Unique)
+}
+
+function Restore-PostAgentNetworkAssociations {
+    param(
+        [string]$ProjectDirectory,
+        [string]$EnvironmentName,
+        [int]$Attempts = 6,
+        [int]$DelaySeconds = 10
+    )
+
+    $values = Get-AzdEnvironmentValues `
+        -ProjectDirectory $ProjectDirectory `
+        -EnvironmentName $EnvironmentName
+    $resourceGroup = [string]$values['AZURE_RESOURCE_GROUP']
+    $vnetId = [string]$values['AZURE_VNET_ID']
+    $resourcePrefix = [string]$values['RESOURCE_PREFIX']
+    if ([string]::IsNullOrWhiteSpace($resourceGroup) -or
+        [string]::IsNullOrWhiteSpace($vnetId) -or
+        [string]::IsNullOrWhiteSpace($resourcePrefix)) {
+        throw 'Provisioning outputs are incomplete for post-Agent network reconciliation.'
+    }
+
+    $vnetName = ($vnetId.TrimEnd('/') -split '/')[-1]
+    $vnetScope = $vnetId.Substring(
+        0,
+        $vnetId.IndexOf(
+            '/providers/Microsoft.Network/virtualNetworks/',
+            [StringComparison]::OrdinalIgnoreCase
+        )
+    )
+    $expectedNsgId = "$vnetScope/providers/Microsoft.Network/networkSecurityGroups/nsg-$resourcePrefix-private-endpoints"
+    $expectedRouteTableId = "$vnetScope/providers/Microsoft.Network/routeTables/rt-$resourcePrefix-agent"
+    $stableConfirmations = 0
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        $privateEndpointSubnet = Invoke-CheckedCommand `
+            -Stage "Verify Private Endpoint subnet NSG ($attempt/$Attempts)" `
+            -FilePath 'az' `
+            -Arguments @(
+                'network', 'vnet', 'subnet', 'show',
+                '--resource-group', $resourceGroup,
+                '--vnet-name', $vnetName,
+                '--name', 'snet-private-endpoints',
+                '--query', 'networkSecurityGroup.id',
+                '--output', 'tsv',
+                '--only-show-errors'
+            ) `
+            -AllowFailure `
+            -Quiet
+        $agentSubnet = Invoke-CheckedCommand `
+            -Stage "Verify Agent subnet route table ($attempt/$Attempts)" `
+            -FilePath 'az' `
+            -Arguments @(
+                'network', 'vnet', 'subnet', 'show',
+                '--resource-group', $resourceGroup,
+                '--vnet-name', $vnetName,
+                '--name', 'snet-agent',
+                '--query', 'routeTable.id',
+                '--output', 'tsv',
+                '--only-show-errors'
+            ) `
+            -AllowFailure `
+            -Quiet
+        $actualNsgId = ($privateEndpointSubnet.Output -join '').Trim()
+        $actualRouteTableId = ($agentSubnet.Output -join '').Trim()
+        $matchesExpectedState = $privateEndpointSubnet.ExitCode -eq 0 -and
+            $agentSubnet.ExitCode -eq 0 -and
+            $actualNsgId.Equals(
+                $expectedNsgId,
+                [StringComparison]::OrdinalIgnoreCase
+            ) -and
+            $actualRouteTableId.Equals(
+                $expectedRouteTableId,
+                [StringComparison]::OrdinalIgnoreCase
+            )
+        if ($matchesExpectedState) {
+            $stableConfirmations++
+            if ($stableConfirmations -ge 2) {
+                Write-Host '[OK] Template subnet NSG and Agent route table remained stable across two read-only confirmations.'
+                return
+            }
+        }
+        else {
+            $stableConfirmations = 0
+            $nsgUpdate = Invoke-CheckedCommand `
+                -Stage "Restore Private Endpoint subnet NSG ($attempt/$Attempts)" `
+                -FilePath 'az' `
+                -Arguments @(
+                    'network', 'vnet', 'subnet', 'update',
+                    '--resource-group', $resourceGroup,
+                    '--vnet-name', $vnetName,
+                    '--name', 'snet-private-endpoints',
+                    '--network-security-group',
+                    "nsg-$resourcePrefix-private-endpoints",
+                    '--output', 'none',
+                    '--only-show-errors'
+                ) `
+                -AllowFailure `
+                -Quiet
+            $routeUpdate = Invoke-CheckedCommand `
+                -Stage "Restore Agent subnet route table ($attempt/$Attempts)" `
+                -FilePath 'az' `
+                -Arguments @(
+                    'network', 'vnet', 'subnet', 'update',
+                    '--resource-group', $resourceGroup,
+                    '--vnet-name', $vnetName,
+                    '--name', 'snet-agent',
+                    '--route-table', "rt-$resourcePrefix-agent",
+                    '--output', 'none',
+                    '--only-show-errors'
+                ) `
+                -AllowFailure `
+                -Quiet
+            if ($nsgUpdate.ExitCode -ne 0 -or $routeUpdate.ExitCode -ne 0) {
+                Write-Warning "Subnet reconciliation attempt $attempt failed and will be retried."
+            }
+        }
+        if ($attempt -lt $Attempts) {
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+    throw "Template subnet controls did not remain stable after $Attempts reconciliation attempts."
+}
+
+function Restore-PostAgentNetworkAssociationsBestEffort {
+    param(
+        [string]$ProjectDirectory,
+        [string]$EnvironmentName
+    )
+
+    try {
+        Restore-PostAgentNetworkAssociations `
+            -ProjectDirectory $ProjectDirectory `
+            -EnvironmentName $EnvironmentName
+    }
+    catch {
+        Write-Warning "Post-Agent network reconciliation was not available: $($_.Exception.Message)"
+    }
 }
 
 function Test-InfrastructureReady {

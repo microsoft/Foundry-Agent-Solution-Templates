@@ -101,6 +101,37 @@ def test_source_minimal_contract_generates_dedicated_group() -> None:
     assert contract["deploymentMode"] == "Source"
     assert contract["environmentName"].startswith("fpha-src-")
     assert contract["resourceGroupName"] == f"rg-{contract['environmentName']}"
+    assert contract["infrastructureProvider"] == "Terraform"
+    assert contract["projectDirectory"] == str(ROOT)
+
+
+def test_bicep_source_contract_routes_to_companion_scenario() -> None:
+    result = run_deploy_contract(
+        "-DeploymentMode",
+        "Source",
+        "-InfrastructureProvider",
+        "Bicep",
+        "-SubscriptionId",
+        SUBSCRIPTION,
+    )
+    assert result.returncode == 0, result.stderr
+    contract = json.loads(result.stdout)
+    assert contract["infrastructureProvider"] == "Bicep"
+    assert contract["projectDirectory"].endswith("scenarios\\bicep")
+
+
+def test_unbound_existing_environment_can_select_terraform() -> None:
+    result = invoke_workflow_contract(
+        "$values = @{}; "
+        "$result = Assert-AzdEnvironmentBinding -ProjectDirectory '.' "
+        "-EnvironmentName 'existing' -DeploymentMode 'Source' "
+        "-InfrastructureProvider 'Terraform' "
+        f"-SubscriptionId '{SUBSCRIPTION}' -ResourceGroupName 'rg-existing' "
+        "-EnvironmentNames @('existing') -CurrentValues $values; "
+        "Write-Output $result.Count"
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "0"
 
 
 def test_acr_contract_accepts_complete_digest_coordinates() -> None:
@@ -966,7 +997,7 @@ def test_unified_preflight_reuses_provider_snapshot() -> None:
 
     assert "'-ProviderValidationJson'" in deploy
     assert "'-ResourceGroupExists'" in deploy
-    assert "-RedactArgumentIndexes @(18)" in deploy
+    assert "-RedactArgumentIndexes @(20)" in deploy
     assert "$ProviderValidationJson | ConvertFrom-Json" in preflight
     assert "$groupExists = $ResourceGroupExists" in preflight
     assert "[REUSE] Required providers and Search regional metadata" in preflight
@@ -1042,6 +1073,153 @@ def test_deploy_scopes_environment_sensitive_commands_explicitly() -> None:
     ):
         script = (ROOT / "scripts" / script_name).read_text(encoding="utf-8")
         assert "Get-AzdValues -EnvironmentName $EnvironmentName" in script
+
+
+@pytest.mark.parametrize(
+    "preview",
+    [
+        "resource x must be replaced",
+        "resource x will be destroyed",
+        "Plan: 0 to add, 1 to change, 1 to destroy.",
+    ],
+)
+def test_terraform_destructive_preview_is_rejected(preview: str) -> None:
+    escaped_preview = preview.replace("'", "''")
+    result = invoke_workflow_contract(
+        f"Assert-SafeProvisionPreview -PreviewOutput @('{escaped_preview}') "
+        "-DeploymentMode 'Source' -InfrastructureProvider 'Terraform'"
+    )
+    assert result.returncode != 0
+    assert "delete or replacement" in result.stderr
+
+
+def test_infrastructure_fingerprint_excludes_terraform_runtime_files() -> None:
+    workflow = (
+        ROOT / "scripts/deployment/workflow.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "'infra-terraform'" in workflow
+    assert "'infra-bicep'" in workflow
+    assert r"$infrastructureDirectory\.terraform\*" in workflow
+    assert r"$infrastructureDirectory\.terraform-cli\*" in workflow
+    assert "$_.Name -eq '.terraform.lock.hcl'" in workflow
+
+
+def test_agent_activation_restores_customer_network_controls() -> None:
+    deploy = DEPLOY.read_text(encoding="utf-8")
+    workflow = (
+        ROOT / "scripts/deployment/workflow.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert deploy.count("Restore-PostAgentNetworkAssociations `") == 2
+    assert deploy.count("Restore-PostAgentNetworkAssociationsBestEffort") == 2
+    first_restore = deploy.index("Restore-PostAgentNetworkAssociations")
+    second_restore = deploy.rindex("Restore-PostAgentNetworkAssociations")
+    assert first_restore < deploy.index("foreach ($validator")
+    assert second_restore < deploy.index(
+        "-Stage 'Assign query-only Search access'"
+    )
+    assert "'snet-private-endpoints'" in workflow
+    assert '"nsg-$resourcePrefix-private-endpoints"' in workflow
+    assert "'snet-agent'" in workflow
+    assert '"rt-$resourcePrefix-agent"' in workflow
+    assert "$stableConfirmations -ge 2" in workflow
+    assert "two read-only confirmations" in workflow
+    assert "Template subnet controls did not remain stable" in workflow
+
+
+def test_network_reconciliation_requires_stable_read_only_confirmations() -> None:
+    result = invoke_workflow_contract(
+        "$script:showCount = 0; $script:updateCount = 0; "
+        "function Start-Sleep { param([int]$Seconds) }; "
+        "function Get-AzdEnvironmentValues { "
+        "return @{ AZURE_RESOURCE_GROUP = 'rg'; "
+        "AZURE_VNET_ID = '/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.Network/virtualNetworks/vnet'; "
+        "RESOURCE_PREFIX = 'prefix' } }; "
+        "function Invoke-CheckedCommand { "
+        "param($Stage, $FilePath, $Arguments, $WorkingDirectory, "
+        "[switch]$AllowFailure, [switch]$Quiet); "
+        "if ($Arguments -contains 'show') { "
+        "$script:showCount++; "
+        "$isNsg = $Arguments -contains 'snet-private-endpoints'; "
+        "if ($script:showCount -le 2) { $value = 'wrong' } "
+        "elseif ($isNsg) { "
+        "$value = '/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.Network/networkSecurityGroups/nsg-prefix-private-endpoints' "
+        "} else { "
+        "$value = '/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.Network/routeTables/rt-prefix-agent' }; "
+        "return [pscustomobject]@{ ExitCode = 0; Output = @($value) } }; "
+        "$script:updateCount++; "
+        "return [pscustomobject]@{ ExitCode = 0; Output = @() } }; "
+        "Restore-PostAgentNetworkAssociations -ProjectDirectory '.' "
+        "-EnvironmentName 'env' -Attempts 4 -DelaySeconds 0; "
+        "[pscustomobject]@{ showCount = $script:showCount; "
+        "updateCount = $script:updateCount } | ConvertTo-Json -Compress"
+    )
+    assert result.returncode == 0, result.stderr
+    contract = json.loads(result.stdout.splitlines()[-1])
+    assert contract == {"showCount": 6, "updateCount": 2}
+
+
+def test_terraform_readiness_race_waits_and_retries_once() -> None:
+    deploy = DEPLOY.read_text(encoding="utf-8")
+    assert "Invoke-TerraformProvisionWithReadinessRetry" in deploy
+
+    result = invoke_workflow_contract(
+        "$script:provisionCount = 0; $script:readinessCount = 0; "
+        "function Start-Sleep { param([int]$Seconds) }; "
+        "function Invoke-CheckedCommand { "
+        "param($Stage, $FilePath, $Arguments, $WorkingDirectory, "
+        "[switch]$AllowFailure, [switch]$Quiet); "
+        "if ($FilePath -eq 'azd') { "
+        "$script:provisionCount++; "
+        "if ($script:provisionCount -eq 1) { "
+        "return [pscustomobject]@{ ExitCode = 1; "
+        "Output = @(\"`e[31m│ Error: creating Private Endpoint`e[0m\", "
+        "'AccountProvisioningStateInvalid:', "
+        "'Account example in state Accepted'); Command = 'azd provision' } }; "
+        "return [pscustomobject]@{ ExitCode = 0; Output = @(); "
+        "Command = 'azd provision' } }; "
+        "$script:readinessCount++; "
+        "$state = if ($script:readinessCount -eq 1) { 'Accepted' } "
+        "else { 'Succeeded' }; "
+        "$json = @([pscustomobject]@{ id = 'account-id'; kind = 'AIServices'; "
+        "tags = [pscustomobject]@{ 'azd-env-name' = 'env' }; "
+        "properties = [pscustomobject]@{ provisioningState = $state } }) "
+        "| ConvertTo-Json -Compress; "
+        "return [pscustomobject]@{ ExitCode = 0; Output = @($json); "
+        "Command = 'az account list' } }; "
+        "$result = Invoke-TerraformProvisionWithReadinessRetry "
+        "-ProjectDirectory '.' -SubscriptionId 'sub' "
+        "-ResourceGroupName 'rg' -EnvironmentName 'env' "
+        "-ReadinessAttempts 3 -ReadinessDelaySeconds 0 "
+        "-ReadinessStabilizationSeconds 0; "
+        "[pscustomobject]@{ exitCode = $result.ExitCode; "
+        "provisionCount = $script:provisionCount; "
+        "readinessCount = $script:readinessCount } | ConvertTo-Json -Compress"
+    )
+    assert result.returncode == 0, result.stderr
+    contract = json.loads(result.stdout.splitlines()[-1])
+    assert contract == {
+        "exitCode": 0,
+        "provisionCount": 2,
+        "readinessCount": 2,
+    }
+
+
+def test_terraform_mixed_failure_is_not_retryable() -> None:
+    result = invoke_workflow_contract(
+        "$output = @('│ Error: creating Private Endpoint', "
+        "'AccountProvisioningStateInvalid: Account in state Accepted', "
+        "'│ Error: creating role assignment', "
+        "'AuthorizationFailed') -join \"`n\"; "
+        "Test-OnlyFoundryPrivateEndpointReadinessRace "
+        "-ProvisionOutput $output"
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "False"
 
 
 @pytest.mark.parametrize(

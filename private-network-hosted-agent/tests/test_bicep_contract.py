@@ -4,8 +4,8 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-PARAMETER_SCHEMA = ROOT / "infra/contract/parameters.schema.json"
-OUTPUT_SCHEMA = ROOT / "infra/contract/outputs.schema.json"
+PARAMETER_SCHEMA = ROOT / "infra-bicep/contract/parameters.schema.json"
+OUTPUT_SCHEMA = ROOT / "infra-bicep/contract/outputs.schema.json"
 
 
 def schema_accepts(schema_path: Path, instance: dict[str, object]) -> bool:
@@ -44,20 +44,20 @@ def build_bicep_template(path: Path) -> dict[str, object]:
 
 def test_main_parameters_is_arm_json() -> None:
     parameters = json.loads(
-        (ROOT / "infra/main.parameters.json").read_text(encoding="utf-8")
+        (ROOT / "infra-bicep/main.parameters.json").read_text(encoding="utf-8")
     )
     assert parameters["$schema"].endswith("deploymentParameters.json#")
     assert "connectivityMode" in parameters["parameters"]
 
 
 def test_regions_default_to_west_us_3() -> None:
-    subscription = (ROOT / "infra/main.bicep").read_text(encoding="utf-8")
-    main = (ROOT / "infra/solution.bicep").read_text(encoding="utf-8")
+    subscription = (ROOT / "infra-bicep/main.bicep").read_text(encoding="utf-8")
+    main = (ROOT / "infra-bicep/solution.bicep").read_text(encoding="utf-8")
     parameters = json.loads(
-        (ROOT / "infra/main.parameters.json").read_text(encoding="utf-8")
+        (ROOT / "infra-bicep/main.parameters.json").read_text(encoding="utf-8")
     )
     contract = json.loads(
-        (ROOT / "infra/contract/parameters.schema.json").read_text(
+        (ROOT / "infra-bicep/contract/parameters.schema.json").read_text(
             encoding="utf-8"
         )
     )
@@ -90,7 +90,7 @@ def test_regions_default_to_west_us_3() -> None:
 def test_bicep_has_no_secret_outputs() -> None:
     bicep = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in (ROOT / "infra").rglob("*.bicep")
+        for path in (ROOT / "infra-bicep").rglob("*.bicep")
     ).lower()
     assert "output s2ssharedkey" not in bicep
     assert "output secret" not in bicep
@@ -99,7 +99,7 @@ def test_bicep_has_no_secret_outputs() -> None:
 
 
 def test_model_is_regional_standard_only() -> None:
-    foundry = (ROOT / "infra/modules/foundry.bicep").read_text(encoding="utf-8")
+    foundry = (ROOT / "infra-bicep/modules/foundry.bicep").read_text(encoding="utf-8")
     assert "name: 'Standard'" in foundry
     assert "GlobalStandard" not in foundry
     assert "DataZoneStandard" not in foundry
@@ -111,13 +111,13 @@ def test_runtime_identity_roles_are_principal_keyed() -> None:
         "key-vault-role-assignment.bicep",
         "account-role-assignment.bicep",
     ):
-        content = (ROOT / "infra/modules" / name).read_text(encoding="utf-8")
+        content = (ROOT / "infra-bicep/modules" / name).read_text(encoding="utf-8")
         assert "guid(" in content
         assert "principalId" in content
 
 
 def test_cmk_roles_are_service_specific_and_least_privilege() -> None:
-    modules = ROOT / "infra/modules"
+    modules = ROOT / "infra-bicep/modules"
     foundry = (modules / "foundry.bicep").read_text(encoding="utf-8")
     key_vault = (modules / "key-vault.bicep").read_text(encoding="utf-8")
     key_role = (modules / "key-role-assignment.bicep").read_text(encoding="utf-8")
@@ -144,7 +144,7 @@ def test_cmk_roles_are_service_specific_and_least_privilege() -> None:
 
 
 def test_private_endpoint_nsg_allows_only_managed_https_ingress() -> None:
-    template = build_bicep_template(ROOT / "infra/modules/network.bicep")
+    template = build_bicep_template(ROOT / "infra-bicep/modules/network.bicep")
     resources = template["resources"]
     expected_destination = "[parameters('privateEndpointSubnetPrefix')]"
 
@@ -200,8 +200,8 @@ def test_private_endpoint_nsg_allows_only_managed_https_ingress() -> None:
 
 
 def test_network_zone_contract_matches_connectivity_modes() -> None:
-    network = (ROOT / "infra/modules/network.bicep").read_text(encoding="utf-8")
-    connectivity = (ROOT / "infra/modules/connectivity.bicep").read_text(
+    network = (ROOT / "infra-bicep/modules/network.bicep").read_text(encoding="utf-8")
+    connectivity = (ROOT / "infra-bicep/modules/connectivity.bicep").read_text(
         encoding="utf-8"
     )
     preflight = (ROOT / "scripts/preflight.ps1").read_text(encoding="utf-8")
@@ -219,7 +219,7 @@ def test_network_zone_contract_matches_connectivity_modes() -> None:
 
 
 def test_vnet_peering_requires_canonical_remote_vnet_id() -> None:
-    connectivity = (ROOT / "infra/modules/connectivity.bicep").read_text(
+    connectivity = (ROOT / "infra-bicep/modules/connectivity.bicep").read_text(
         encoding="utf-8"
     )
     schema = json.loads(PARAMETER_SCHEMA.read_text(encoding="utf-8"))
@@ -236,12 +236,12 @@ def test_vnet_peering_requires_canonical_remote_vnet_id() -> None:
 
 
 def test_existing_acr_connection_is_optional_and_connection_only() -> None:
-    main = (ROOT / "infra/solution.bicep").read_text(encoding="utf-8")
+    main = (ROOT / "infra-bicep/solution.bicep").read_text(encoding="utf-8")
     parameters = json.loads(
-        (ROOT / "infra/main.parameters.json").read_text(encoding="utf-8")
+        (ROOT / "infra-bicep/main.parameters.json").read_text(encoding="utf-8")
     )["parameters"]
     connection = (
-        ROOT / "infra/modules/container-registry-connection.bicep"
+        ROOT / "infra-bicep/modules/container-registry-connection.bicep"
     ).read_text(encoding="utf-8")
 
     assert "containerRegistryInputsArePaired" in main
@@ -264,9 +264,9 @@ def test_existing_acr_connection_is_optional_and_connection_only() -> None:
 
 
 def test_parameter_schema_matches_and_validates_public_entry_point() -> None:
-    main = (ROOT / "infra/main.bicep").read_text(encoding="utf-8")
+    main = (ROOT / "infra-bicep/main.bicep").read_text(encoding="utf-8")
     parameter_file = json.loads(
-        (ROOT / "infra/main.parameters.json").read_text(encoding="utf-8")
+        (ROOT / "infra-bicep/main.parameters.json").read_text(encoding="utf-8")
     )["parameters"]
     schema = json.loads(PARAMETER_SCHEMA.read_text(encoding="utf-8"))
     declarations = {
@@ -376,7 +376,7 @@ def test_parameter_schema_matches_and_validates_public_entry_point() -> None:
         ),
     )
 def test_output_schema_matches_and_validates_public_outputs() -> None:
-    main = (ROOT / "infra/main.bicep").read_text(encoding="utf-8")
+    main = (ROOT / "infra-bicep/main.bicep").read_text(encoding="utf-8")
     schema = json.loads(OUTPUT_SCHEMA.read_text(encoding="utf-8"))
     declarations = {
         match.group("name"): match.group("type")
@@ -415,9 +415,9 @@ def test_output_schema_matches_and_validates_public_outputs() -> None:
 
 
 def test_subscription_entry_point_owns_only_generated_resource_group() -> None:
-    main = (ROOT / "infra/main.bicep").read_text(encoding="utf-8")
+    main = (ROOT / "infra-bicep/main.bicep").read_text(encoding="utf-8")
     parameters = json.loads(
-        (ROOT / "infra/main.parameters.json").read_text(encoding="utf-8")
+        (ROOT / "infra-bicep/main.parameters.json").read_text(encoding="utf-8")
     )["parameters"]
 
     assert "targetScope = 'subscription'" in main

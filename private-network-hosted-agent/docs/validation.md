@@ -26,8 +26,9 @@ Management-plane and template-contract checks include:
 - Foundry and Search local-auth configuration;
 - private endpoint approval;
 - Key Vault protection, key separation, and Foundry CMK binding;
-- absence of template-owned ACR, Dockerfile, Terraform, App Insights, and Log
-  Analytics;
+- absence of template-owned ACR, Dockerfile, App Insights, and Log Analytics;
+- Terraform and Bicep contract parity and the selected provider's expected
+  infrastructure files;
 - optional existing ACR settings, connection target, and external pull
   authorization.
 

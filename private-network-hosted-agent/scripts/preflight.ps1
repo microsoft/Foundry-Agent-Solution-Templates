@@ -14,6 +14,8 @@ param(
     [string]$FoundryProjectId = '',
     [ValidateSet('Source', 'ExistingPrivateAcr')]
     [string]$DeploymentMode = 'Source',
+    [ValidateSet('Terraform', 'Bicep')]
+    [string]$InfrastructureProvider = 'Terraform',
     [string]$ProviderValidationJson = '',
     [ValidateSet('', 'true', 'false')]
     [string]$ResourceGroupExists = '',
@@ -71,7 +73,7 @@ if ($groupExists -eq 'true') {
     Write-Host "[OK] Existing resource group: $($group.name) ($($group.location))"
 }
 elseif ($AllowMissingResourceGroup) {
-    Write-Host "[OK] Dedicated resource group will be created by subscription-scope Bicep: $ResourceGroupName"
+    Write-Host "[OK] Dedicated resource group will be created by ${InfrastructureProvider}: $ResourceGroupName"
 }
 else {
     throw "Resource group '$ResourceGroupName' does not exist."
@@ -216,9 +218,18 @@ if ($ConnectivityMode -eq 'vnetPeering' -and
     throw 'RemoteVnetResourceId must be a canonical virtual network ARM resource ID for vnetPeering.'
 }
 
-if (Get-ChildItem -Path (Split-Path $PSScriptRoot) -Recurse -File |
-    Where-Object { $_.Name -match '^(Dockerfile|.*\.tf)$' }) {
-    throw 'Docker or Terraform artifacts violate the template repository contract.'
+$templateRoot = Split-Path $PSScriptRoot
+$infraTerraformRoot = Join-Path $templateRoot 'infra-terraform'
+$forbiddenArtifacts = @(Get-ChildItem -Path $templateRoot -Recurse -File |
+    Where-Object {
+        $_.Name -eq 'Dockerfile' -or
+        (
+            $_.Extension -in @('.tf', '.tfvars') -and
+            $_.FullName -notlike (Join-Path $infraTerraformRoot '*')
+        )
+    })
+if ($forbiddenArtifacts.Count -gt 0) {
+    throw "Infrastructure artifacts violate the template repository contract: $($forbiddenArtifacts.FullName -join ', ')."
 }
 
 if ($hasAnyAcrInput.Count -gt 0) {

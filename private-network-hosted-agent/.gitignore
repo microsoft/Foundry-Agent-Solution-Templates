@@ -12,6 +12,9 @@ htmlcov/
 artifacts/
 *.log
 *.zip
-infra/main.json
+infra-bicep/main.json
+.terraform/
+*.tfstate
+*.tfstate.*
 azurevpnconfig.xml
 VpnServer/

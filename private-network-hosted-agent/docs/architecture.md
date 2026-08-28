@@ -53,10 +53,10 @@ from this template's implementation:
 
 | Statement shown in the diagram | Evidence and scope |
 |---|---|
-| A model deployment belongs to the Foundry account, alongside the project. | Microsoft Learn's [Hosted agent permissions reference — Foundry account setup](https://learn.microsoft.com/azure/foundry/agents/concepts/hosted-agent-permissions#foundry-account-setup) depicts `Model Deployment` and `Foundry Project` beneath `Foundry Account`. In this template, `infra/modules/foundry.bicep` declares both `Microsoft.CognitiveServices/accounts/deployments` and `Microsoft.CognitiveServices/accounts/projects` with the account as parent. |
+| A model deployment belongs to the Foundry account, alongside the project. | Microsoft Learn's [Hosted agent permissions reference — Foundry account setup](https://learn.microsoft.com/azure/foundry/agents/concepts/hosted-agent-permissions#foundry-account-setup) depicts `Model Deployment` and `Foundry Project` beneath `Foundry Account`. In this template, `infra-terraform/modules/foundry/main.tf` and its `infra-bicep/modules/foundry.bicep` companion declare the account deployment and project hierarchy. |
 | A Hosted Agent can perform model inference through the project endpoint. | Microsoft Learn's [Deploy a hosted agent from source code](https://learn.microsoft.com/azure/foundry/agents/how-to/deploy-hosted-agent-code) states that the platform-assigned agent identity can access model inferencing through the project endpoint by default. This agent constructs `AIProjectClient` from `FOUNDRY_PROJECT_ENDPOINT`, obtains its OpenAI client, and selects `AZURE_AI_MODEL_DEPLOYMENT_NAME` in `agent/search-agent/main.py`. |
 | A VNet client using the Foundry Private Endpoint reaches both the Foundry resource/account endpoint and its project endpoint over Private Link. | Microsoft Learn's [How to configure network isolation for Microsoft Foundry — DNS configuration](https://learn.microsoft.com/azure/foundry/how-to/configure-private-link#dns-configuration) states that VNet clients use the same connection string as public-endpoint clients and that DNS resolution routes connections to the Foundry resource **and projects** over a private link. The public-form endpoint name therefore does not imply public-Internet transport when it resolves to the Private Endpoint address. |
-| Account and project access share one account-scoped Private Endpoint; there is no separate project or model-deployment Private Endpoint in this design. | Microsoft Learn's [Set up private networking for Foundry Agent Service — DNS zone configurations summary](https://learn.microsoft.com/azure/foundry/agents/how-to/virtual-networks#dns-zone-configurations-summary) identifies the Foundry Private Link resource as subresource `account` and lists `privatelink.cognitiveservices.azure.com`, `privatelink.openai.azure.com`, and `privatelink.services.ai.azure.com`. The template uses group ID `account`, targets the Foundry account, and links those three zones in `infra/modules/foundry.bicep` and `infra/modules/private-dns.bicep`. |
+| Account and project access share one account-scoped Private Endpoint; there is no separate project or model-deployment Private Endpoint in this design. | Microsoft Learn's [Set up private networking for Foundry Agent Service — DNS zone configurations summary](https://learn.microsoft.com/azure/foundry/agents/how-to/virtual-networks#dns-zone-configurations-summary) identifies the Foundry Private Link resource as subresource `account` and lists `privatelink.cognitiveservices.azure.com`, `privatelink.openai.azure.com`, and `privatelink.services.ai.azure.com`. Both `infra-terraform` and `infra-bicep` use group ID `account`, target the Foundry account, and link those three zones. |
 | The Hosted Agent runtime has VNet-attached outbound connectivity. | Microsoft Learn's [Deep dive into Foundry Agent Service networking — Hosted agent path](https://learn.microsoft.com/azure/foundry/agents/concepts/agents-networking-deep-dive#hosted-agent-path) states that the Micro VM has a dedicated NIC in the delegated subnet for the agent's own outbound traffic. The template configures Foundry `networkInjections` for that subnet. |
 | Private Link traffic from the VNet to the Azure service stays on the Microsoft backbone and isn't exposed to the public Internet. | Microsoft Learn's [Secure your Azure Private Link deployment](https://learn.microsoft.com/azure/private-link/secure-private-link) states that traffic between a virtual network and a service through Private Link travels the Microsoft backbone network, eliminating exposure to the public Internet. This statement covers the customer-VNet-to-Foundry Private Link segment; it does not document Foundry's internal model-routing implementation. |
 
@@ -94,9 +94,9 @@ Foundry and Search CMK operations follow separate dashed paths directly to Key
 Vault. These service-managed wrap, unwrap, and key-metadata operations use the
 Key Vault `AzureServices` trusted-services bypass and the respective managed
 identities. They do not traverse the Agent subnet, Key Vault Private Endpoint,
-or solution Firewall. ARM/Bicep deployment is also a management-plane path and
-does not require the deployment workstation to reach the Key Vault Private
-Endpoint.
+or solution Firewall. Terraform and ARM/Bicep provisioning are management-plane
+paths and do not require the deployment workstation to reach the Key Vault
+Private Endpoint.
 
 ### Existing private ACR path
 
@@ -216,8 +216,9 @@ gateway public IP.
 
 ### Agent subnet through Azure Firewall
 
-`infra/modules/network.bicep` installs only the following public egress rules
-from the Agent subnet. Every rule is limited to TCP/HTTPS 443.
+`infra-terraform/modules/network/main.tf` and its
+`infra-bicep/modules/network.bicep` companion install only the following public
+egress rules from the Agent subnet. Every rule is limited to TCP/HTTPS 443.
 
 | Allowed destination | Rule type | Why it is required |
 |---|---|---|
