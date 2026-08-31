@@ -42,7 +42,7 @@ services:
               value: ${AZURE_SEARCH_ENDPOINT}
             - name: AZURE_SEARCH_INDEX_NAME
               value: ${AZURE_SEARCH_INDEX_NAME}
-            - name: FOUNDRY_LOCAL_DEVELOPMENT
+            - name: APP_LOCAL_DEVELOPMENT
               value: "false"
         kind: hosted
         name: private-search-agent

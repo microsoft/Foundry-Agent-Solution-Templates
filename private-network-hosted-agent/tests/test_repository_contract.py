@@ -142,7 +142,7 @@ def test_existing_private_acr_scenario_uses_prebuilt_digest_image() -> None:
         "runtime:",
         "path: Dockerfile",
         "context:",
-        "FOUNDRY_LOCAL_DEVELOPMENT",
+        "APP_LOCAL_DEVELOPMENT",
         "\n        project:",
     ):
         assert forbidden not in scenario
