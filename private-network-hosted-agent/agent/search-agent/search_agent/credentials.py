@@ -15,7 +15,7 @@ def get_azure_credential() -> TokenCredential:
     Developer credential discovery is available only when explicitly enabled.
     """
 
-    if os.getenv("FOUNDRY_LOCAL_DEVELOPMENT", "").lower() == "true":
+    if os.getenv("APP_LOCAL_DEVELOPMENT", "").lower() == "true":
         return DefaultAzureCredential(
             exclude_interactive_browser_credential=True,
             require_envvar=False,
