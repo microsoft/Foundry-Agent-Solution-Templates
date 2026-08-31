@@ -73,7 +73,7 @@ services:
               value: ${TOOLBOX_TOOLS_MCP_ENDPOINT}
         codeConfiguration:
             entryPoint: main.py
-            runtime: python_3_13
+            runtime: python_3_14
         container:
             resources:
                 cpu: "0.5"
