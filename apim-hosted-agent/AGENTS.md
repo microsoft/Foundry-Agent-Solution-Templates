@@ -44,6 +44,8 @@ API, and MCP tools are exposed through APIM tool APIs.
   `model_deployment_name` in `infra-terraform/main.tfvars.json`.
 - Keep the hosted agent's model endpoint on the project-compatible APIM path.
   Do not bypass APIM with a direct Foundry endpoint.
+- Do not declare custom environment variables with the `AGENT_*` or
+  `FOUNDRY_*` prefixes. The hosted-agent platform reserves and injects them.
 - Derive per-user model quota keys only from Foundry's platform-provided
   `user_id_key`. Do not trust a caller-supplied identity header or log the raw
   platform user identifier.

@@ -25,8 +25,6 @@ set_resilient_tasks_enabled(True)
 async def main():
     credential = DefaultAzureCredential()
 
-    os.environ["TOOLBOX_ENDPOINT"] = os.environ["AGENT_TOOLBOX_ENDPOINT"].strip()
-
     # FoundryToolbox resolves the toolbox endpoint from the environment
     # (TOOLBOX_ENDPOINT, or FOUNDRY_PROJECT_ENDPOINT + TOOLBOX_NAME), authenticates
     # every request with the credential, and transparently forwards the platform
@@ -35,8 +33,8 @@ async def main():
     toolbox = FoundryToolbox(credential)
 
     client = FoundryChatClient(
-        project_endpoint=os.environ["AGENT_APIM_PROJECT_ENDPOINT"].strip(),
-        model=os.environ["AGENT_MODEL_DEPLOYMENT"].strip(),
+        project_endpoint=os.environ["APIM_PROJECT_ENDPOINT"].strip(),
+        model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"].strip(),
         credential=credential,
         default_headers={"User-Agent": "apim-hosted-agent-v1"},
         middleware=[EndUserIdentityForwardingMiddleware()],
