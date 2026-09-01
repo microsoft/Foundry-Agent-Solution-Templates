@@ -65,15 +65,15 @@ services:
             - project
             - tools
         environmentVariables:
-            - name: AGENT_MODEL_DEPLOYMENT
+            - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
               value: ${APIM_FOUNDRY_MODEL_DEPLOYMENT_NAME}
-            - name: AGENT_APIM_PROJECT_ENDPOINT
+            - name: APIM_PROJECT_ENDPOINT
               value: ${APIM_FOUNDRY_DIRECT_PROJECT_ENDPOINT}
-            - name: AGENT_TOOLBOX_ENDPOINT
+            - name: TOOLBOX_ENDPOINT
               value: ${TOOLBOX_TOOLS_MCP_ENDPOINT}
         codeConfiguration:
             entryPoint: main.py
-            runtime: python_3_13
+            runtime: python_3_14
         container:
             resources:
                 cpu: "0.5"
