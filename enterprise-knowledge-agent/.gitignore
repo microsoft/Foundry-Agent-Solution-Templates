@@ -1,0 +1,7 @@
+.azure/
+.venv/
+__pycache__/
+*.pyc
+live-validation.json
+src/eval.yaml
+src/.agent_configs/

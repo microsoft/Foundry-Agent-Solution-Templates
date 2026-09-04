@@ -1,0 +1,12 @@
+name: enterprise-documents-ks
+kind: searchIndex
+description: Synthetic enterprise policies and operating facts.
+searchIndexParameters:
+  searchIndexName: enterprise-documents
+  semanticConfigurationName: enterprise-semantic
+  searchFields: []
+  sourceDataFields:
+    - name: title
+    - name: content
+    - name: source_url
+

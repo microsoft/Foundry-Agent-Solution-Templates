@@ -1,0 +1,16 @@
+# BYO: this index must already exist in AZURE_SEARCH_ENDPOINT. Copy this file
+# into config/knowledge-sources/ and replace the environment variables.
+name: customer-documents-ks
+kind: searchIndex
+description: Customer-owned indexed documents with stable citations.
+searchIndexParameters:
+  searchIndexName: ${CUSTOMER_SEARCH_INDEX_NAME}
+  semanticConfigurationName: ${CUSTOMER_SEARCH_SEMANTIC_CONFIG}
+  searchFields:
+    - name: content
+  sourceDataFields:
+    - name: document_id
+    - name: title
+    - name: source_url
+    - name: page_number
+

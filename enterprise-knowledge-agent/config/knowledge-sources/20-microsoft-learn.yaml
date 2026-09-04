@@ -1,0 +1,10 @@
+name: microsoft-learn-ks
+kind: mcpServer
+description: Official Microsoft product documentation from Microsoft Learn MCP.
+mcpServerParameters:
+  serverURL: https://learn.microsoft.com/api/mcp
+  tools:
+    - name: microsoft_docs_search
+      outputParsing:
+        kind: auto
+      maxOutputTokens: 1500

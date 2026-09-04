@@ -1,0 +1,6 @@
+type: mcp
+name: knowledge_base
+server_label: knowledge_base
+server_url: ${KB_MCP_ENDPOINT}
+project_connection_id: ${KB_CONNECTION_NAME}
+require_approval: never
