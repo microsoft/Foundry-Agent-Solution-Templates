@@ -1,0 +1,10 @@
+# BYO connection: create a UserEntraToken RemoteTool connection named below.
+# Requires delegated user identity, tenant policy support, and Microsoft 365
+# Copilot Business Chat. Live validation is intentionally deferred.
+name: workiq-calendar
+type: mcp
+server_label: workiq-calendar
+server_url: https://agent365.svc.cloud.microsoft/agents/servers/mcp_CalendarTools
+project_connection_id: ${WORKIQ_CALENDAR_CONNECTION_NAME}
+require_approval: never
+
