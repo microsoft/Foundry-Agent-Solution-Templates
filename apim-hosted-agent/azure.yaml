@@ -28,7 +28,7 @@ services:
         host: azure.ai.toolbox
         uses:
             - project
-        description: Microsoft Learn and GitHub tools through governed APIM MCP gateways.
+        description: Microsoft Learn, GitHub, and optional Google tools through governed APIM MCP gateways.
         tools:
             - connection: github
               name: github
@@ -81,7 +81,7 @@ services:
 infra:
     layers:
         - provider: microsoft.foundry
-          path: .
+          path: infra/foundry
           name: foundry
         - provider: bicep
           path: infra

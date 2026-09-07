@@ -4,6 +4,9 @@
     "foundryAccountName": {
       "value": "${AZURE_AI_ACCOUNT_NAME}"
     },
+    "foundryResourceGroupName": {
+      "value": "${AZURE_FOUNDRY_RESOURCE_GROUP}"
+    },
     "foundryProjectName": {
       "value": "${AZURE_AI_PROJECT_NAME}"
     },
@@ -18,6 +21,18 @@
     },
     "githubOAuthClientSecret": {
       "value": "${GITHUB_OAUTH_CLIENT_SECRET}"
+    },
+    "googleMcpEnabled": {
+      "value": "${GOOGLE_MCP_ENABLED=false}"
+    },
+    "googleMcpUrl": {
+      "value": "${GOOGLE_MCP_URL=}"
+    },
+    "googleOAuthClientId": {
+      "value": "${GOOGLE_OAUTH_CLIENT_ID=}"
+    },
+    "googleOAuthClientSecret": {
+      "value": "${GOOGLE_OAUTH_CLIENT_SECRET=}"
     }
   }
 }

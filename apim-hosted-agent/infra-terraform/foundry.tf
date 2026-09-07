@@ -70,6 +70,48 @@ resource "azapi_resource" "github_connection" {
   ]
 }
 
+resource "azapi_resource" "google_connection" {
+  count = local.google_enabled ? 1 : 0
+
+  type                      = "Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01"
+  name                      = "google"
+  parent_id                 = local.foundry_project_id
+  schema_validation_enabled = false
+
+  body = {
+    properties = {
+      target           = module.google_tool[0].gateway_url
+      authType         = "OAuth2"
+      category         = "RemoteTool"
+      peRequirement    = "NotRequired"
+      authorizationUrl = "https://accounts.google.com/o/oauth2/v2/auth"
+      tokenUrl         = "https://oauth2.googleapis.com/token"
+      refreshUrl       = "https://oauth2.googleapis.com/token"
+      scopes = [
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+      ]
+    }
+  }
+
+  sensitive_body = {
+    properties = {
+      credentials = {
+        clientId     = var.google_oauth_client_id
+        clientSecret = var.google_oauth_client_secret
+      }
+    }
+  }
+
+  response_export_values = ["properties.redirectUrl"]
+
+  depends_on = [
+    azapi_resource.learn_connection,
+    module.google_tool,
+  ]
+}
+
 resource "azapi_resource" "account_to_apim_link" {
   type                      = "Microsoft.Resources/links@2016-09-01"
   name                      = substr(sha256("${local.foundry_account_id}|${azapi_resource.apim.id}"), 0, 16)

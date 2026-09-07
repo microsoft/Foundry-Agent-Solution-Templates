@@ -1,7 +1,7 @@
 resource "azapi_resource" "apim" {
   type      = "Microsoft.ApiManagement/service@2024-05-01"
   name      = local.effective_apim_name
-  parent_id = data.azurerm_resource_group.current.id
+  parent_id = azurerm_resource_group.current.id
   location  = var.location
 
   body = {
@@ -197,6 +197,23 @@ module "github_tool" {
   apim_name            = azapi_resource.apim.name
   foundry_project_name = var.foundry_project_name
   policy               = file("${local.policy_dir}/foundry-tool-github-mcp-policy.xml")
+
+  depends_on = [
+    azapi_resource.policy_named_value,
+    azapi_resource.tool_content_safety_policy_fragment,
+    azurerm_role_assignment.apim_cognitive_services_user,
+  ]
+}
+
+module "google_tool" {
+  count  = local.google_enabled ? 1 : 0
+  source = "./modules/apim-tool-google"
+
+  apim_id              = azapi_resource.apim.id
+  apim_name            = azapi_resource.apim.name
+  foundry_project_name = var.foundry_project_name
+  google_mcp_endpoint  = var.google_mcp_endpoint
+  policy               = file("${local.policy_dir}/foundry-tool-google-mcp-policy.xml")
 
   depends_on = [
     azapi_resource.policy_named_value,

@@ -4,7 +4,7 @@ This sample focuses on the API gateway pattern for enterprise AI agents. It depl
 It provides:
 - **Agent protection**: Uses Azure platform DDoS protection, APIM rate limiting, and Microsoft Entra token validation.
 - **Model token metering and budget control**: Enforces per-platform-user tokens-per-minute and hourly token quotas.
-- **Tool permission policy**: Applies governed MCP policies and optional GitHub user and tool denylists.
+- **Tool permission policy**: Applies governed MCP policies and optional user and tool denylists.
 - **AI content safety**: Explicitly blocks harmful Responses model prompts and applies shared safety policies to agent and MCP boundaries.
 
 ## What this template is for
@@ -33,13 +33,15 @@ Review [Cost planning](docs/cost.md) before provisioning.
 
 The sample includes:
 
-- **APIM APIs:** a hosted-agent ingress API, a direct hosted-agent model API, and governed MCP tool APIs for Microsoft Learn and GitHub;
+- **APIM APIs:** a hosted-agent ingress API, a direct hosted-agent model API, and governed MCP tool APIs;
 - **Agent ingress policies:** apply authentication, rate limiting, and inbound and outbound Content Safety;
 - **Model gateway policies:** authenticate the hosted agent, enforce harmful-content checks and per-user token limits, and route Responses requests to Foundry with managed identity and TLS certificate chain and hostname validation;
 - **Microsoft Learn MCP policies:** provide per-caller rate limiting and inbound
   and outbound harm-category filtering;
 - **GitHub MCP policies:** validate GitHub OAuth, enforce user and tool denylists,
   rate-limit callers, and apply shared Content Safety checks.
+
+Google MCP is optional and disabled by default. See the [Google MCP guide](docs/google/README.md) to configure, enable, deploy, test, or disable it.
 
 ## Run the agent
 
@@ -198,7 +200,7 @@ OAuth token for subsequent tool calls.
 
 ## Customize limits
 
-Change per-user model limits, request-rate, GitHub governance, and Content
+Change per-user model limits, request-rate, tool governance, and Content
 Safety settings in **API Management > Named values**. Named-value changes affect
 policy execution without changing policy XML. Rate-limit and token-limit values
 are included in their counter keys, so changing a configured limit starts a
@@ -210,7 +212,8 @@ change must persist.
 
 ## Policy Defaults
 
-APIM exposes exactly 13 administrator-facing named values. Deployment wiring
+APIM exposes administrator-facing named values for limits, safety, and tool
+governance. Deployment wiring
 such as tenant ID, project managed-identity principal ID, backend ID, project
 name, and model deployment name is embedded by the selected IaC template and is not shown as
 policy configuration.

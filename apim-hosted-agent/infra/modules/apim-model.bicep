@@ -6,6 +6,9 @@ param apimName string
 @description('Microsoft Foundry account name and portal-compatible model API ID.')
 param foundryAccountName string
 
+@description('Resource group that contains the Microsoft Foundry account and project.')
+param foundryResourceGroupName string
+
 @description('Microsoft Foundry project name.')
 param foundryProjectName string
 
@@ -66,6 +69,7 @@ resource apim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
 }
 
 resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+  scope: resourceGroup(foundryResourceGroupName)
   name: foundryAccountName
 }
 
@@ -228,14 +232,6 @@ resource productSubscription 'Microsoft.ApiManagement/service/subscriptions@2024
   ]
 }
 
-resource accountToApimLink 'Microsoft.Resources/links@2016-09-01' = {
-  scope: foundryAccount
-  name: uniqueString(foundryAccount.id, apim.id, 'account-apim')
-  properties: {
-    targetId: apim.id
-  }
-}
-
 resource apimToAccountLink 'Microsoft.Resources/links@2016-09-01' = {
   scope: apim
   name: uniqueString(apim.id, foundryAccount.id, 'apim-account')
@@ -244,11 +240,14 @@ resource apimToAccountLink 'Microsoft.Resources/links@2016-09-01' = {
   }
 }
 
-resource projectToProductLink 'Microsoft.Resources/links@2016-09-01' = {
-  scope: foundryProject
-  name: uniqueString(foundryProject.id, product.id, 'project-product')
-  properties: {
-    targetId: product.id
+module foundryResourceLinks 'foundry-resource-links.bicep' = {
+  name: 'foundry-resource-links'
+  scope: resourceGroup(foundryResourceGroupName)
+  params: {
+    foundryAccountName: foundryAccountName
+    foundryProjectName: foundryProjectName
+    apimId: apim.id
+    productId: product.id
   }
 }
 

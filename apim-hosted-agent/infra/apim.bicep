@@ -23,6 +23,9 @@ param publisherEmail string
 @description('APIM API ID used by the associated model gateway.')
 param modelApiId string
 
+@description('Resource group that contains the Microsoft Foundry account and project.')
+param foundryResourceGroupName string
+
 @description('Microsoft Foundry project name used in the governed tool route.')
 param foundryProjectName string
 
@@ -71,6 +74,25 @@ param githubBlockedUserNames string = ''
 @description('Optional comma-separated GitHub MCP tool names denied by APIM. Matching is case-insensitive.')
 param githubBlockedToolNames string = ''
 
+@description('Explicit Google MCP opt-in. Google resources are created only when this is true and all required Google values are set.')
+param googleMcpEnabled string = 'false'
+
+@description('Optional Google MCP HTTPS endpoint ending in /mcp.')
+param googleMcpEndpoint string = ''
+
+@description('Optional Google Web application OAuth client ID.')
+param googleOAuthClientId string = ''
+
+@secure()
+@description('Optional Google Web application OAuth client secret.')
+param googleOAuthClientSecret string = ''
+
+@description('Optional comma-separated Google email addresses denied access to the Google MCP route. Matching is case-insensitive.')
+param googleBlockedEmails string = ''
+
+@description('Optional comma-separated Google MCP tool names denied by APIM. Matching is case-insensitive.')
+param googleBlockedToolNames string = ''
+
 @minValue(0)
 @maxValue(7)
 param contentSafetyHateThreshold int = 7
@@ -85,10 +107,6 @@ param contentSafetySexualThreshold int = 7
 param contentSafetyViolenceThreshold int = 7
 param contentSafetyPromptShieldEnabled bool = true
 
-var cognitiveServicesUserRoleDefinitionId = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  'a97b65f3-24c7-4388-baec-2e87135dc908'
-)
 var effectiveApimName = empty(apimName)
   ? 'apim-${uniqueString(subscription().id, resourceGroup().id)}'
   : apimName
@@ -96,7 +114,11 @@ var githubEnabled = !empty(githubOAuthClientId) && !empty(githubOAuthClientSecre
 var githubMcpGatewayUrl = 'https://${effectiveApimName}.azure-api.net/tool-${toLower(foundryProjectName)}-github-mcp'
 var effectiveGithubBlockedUserNames = empty(githubBlockedUserNames) ? '__none__' : githubBlockedUserNames
 var effectiveGithubBlockedToolNames = empty(githubBlockedToolNames) ? '__none__' : githubBlockedToolNames
-var policyNamedValues = [
+var googleEnabled = toLower(googleMcpEnabled) == 'true' && !empty(googleMcpEndpoint) && !empty(googleOAuthClientId) && !empty(googleOAuthClientSecret)
+var googleMcpGatewayUrl = 'https://${effectiveApimName}.azure-api.net/tool-${toLower(foundryProjectName)}-google-mcp'
+var effectiveGoogleBlockedEmails = empty(googleBlockedEmails) ? '__none__' : googleBlockedEmails
+var effectiveGoogleBlockedToolNames = empty(googleBlockedToolNames) ? '__none__' : googleBlockedToolNames
+var policyNamedValues = concat([
   {
     name: 'policy-user-tokens-per-minute'
     value: string(modelUserTokensPerMinute)
@@ -134,7 +156,16 @@ var policyNamedValues = [
   { name: 'policy-content-safety-sexual-threshold', value: string(contentSafetySexualThreshold) }
   { name: 'policy-content-safety-violence-threshold', value: string(contentSafetyViolenceThreshold) }
   { name: 'policy-content-safety-prompt-shield-enabled', value: string(contentSafetyPromptShieldEnabled) }
-]
+], googleEnabled ? [
+  {
+    name: 'policy-google-blocked-emails'
+    value: effectiveGoogleBlockedEmails
+  }
+  {
+    name: 'policy-google-blocked-tools'
+    value: effectiveGoogleBlockedToolNames
+  }
+] : [])
 
 resource apim 'Microsoft.ApiManagement/service@2024-05-01' = {
   name: effectiveApimName
@@ -178,6 +209,7 @@ resource policyNamedValueResources 'Microsoft.ApiManagement/service/namedValues@
 }]
 
 resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+  scope: resourceGroup(foundryResourceGroupName)
   name: modelApiId
 }
 
@@ -196,13 +228,12 @@ resource agentPrincipalNamedValue 'Microsoft.ApiManagement/service/namedValues@2
   }
 }
 
-resource apimCognitiveServicesUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: foundryAccount
-  name: guid(foundryAccount.id, apim.id, cognitiveServicesUserRoleDefinitionId)
-  properties: {
-    principalId: apim.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: cognitiveServicesUserRoleDefinitionId
+module apimCognitiveServicesUser 'modules/foundry-account-role.bicep' = {
+  name: 'foundry-account-role'
+  scope: resourceGroup(foundryResourceGroupName)
+  params: {
+    foundryAccountName: modelApiId
+    apimPrincipalId: apim.identity.principalId
   }
 }
 
@@ -267,6 +298,7 @@ module model 'modules/apim-model.bicep' = {
   params: {
     apimName: apim.name
     foundryAccountName: modelApiId
+    foundryResourceGroupName: foundryResourceGroupName
     foundryProjectName: foundryProjectName
     modelDeploymentName: modelDeploymentName
     tenantId: tenant().tenantId
@@ -306,6 +338,20 @@ module githubTool 'modules/apim-tool-github.bicep' = if (githubEnabled) {
   ]
 }
 
+module googleTool 'modules/apim-tool-google.bicep' = if (googleEnabled) {
+  name: 'tool-google'
+  params: {
+    apimName: apim.name
+    foundryProjectName: foundryProjectName
+    googleMcpEndpoint: googleMcpEndpoint
+  }
+  dependsOn: [
+    policyNamedValueResources
+    toolContentSafetyPolicyFragment
+    apimCognitiveServicesUser
+  ]
+}
+
 output APIM_NAME string = apim.name
 output APIM_RESOURCE_ID string = apim.id
 output APIM_GATEWAY_URL string = 'https://${apim.name}.azure-api.net'
@@ -318,3 +364,5 @@ output APIM_FOUNDRY_SUBSCRIPTION_NAME string = model.outputs.productSubscription
 output MSLEARN_MCP_URL string = learnTool.outputs.gatewayUrl
 output GITHUB_MCP_ENABLED bool = githubEnabled
 output GITHUB_MCP_URL string = githubEnabled ? githubMcpGatewayUrl : ''
+output GOOGLE_MCP_ENABLED bool = googleEnabled
+output GOOGLE_MCP_URL string = googleEnabled ? googleMcpGatewayUrl : ''

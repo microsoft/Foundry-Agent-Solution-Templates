@@ -5,6 +5,9 @@ Management (APIM). Preserve the governed request paths: callers enter through
 the APIM agent API, the hosted agent reaches its model through the APIM model
 API, and MCP tools are exposed through APIM tool APIs.
 
+This project was built with the microsoft-foundry skill. Before working on or
+answering questions about Foundry agents, read the microsoft-foundry skill first.
+
 ## Key files
 
 - `azure.yaml` — azd orchestration for the Foundry project, toolbox, hosted
@@ -19,7 +22,7 @@ API, and MCP tools are exposed through APIM tool APIs.
 - `infra/modules/apim-model.bicep` — hosted-agent model gateway, portal
   Product, and resource links
 - `infra/modules/apim-tool-*.bicep` — governed Microsoft Learn and optional
-  GitHub MCP gateways
+  GitHub/Google MCP gateways
 - `infra/foundry.bicep` — Foundry project RBAC and Bicep-owned MCP connections
 - `infra/*.parameters.json` — azd parameter mappings for the Bicep layers
 - `azure-terraform.yaml` — alternate azd manifest; rename it to `azure.yaml`
@@ -33,6 +36,8 @@ API, and MCP tools are exposed through APIM tool APIs.
   identity binding
 - `docs/apim-policies.md` — policy behavior, counter keys, trust boundaries, and
   configuration reference
+- `docs/google/` — all manual Google MCP setup, OAuth, deployment, consent,
+  testing, and disablement instructions
 - `docs/cost.md` — cost components, estimate inputs, and cost guardrails
 
 ## Preserve these invariants
@@ -56,12 +61,15 @@ API, and MCP tools are exposed through APIM tool APIs.
 - Keep MCP connections declared in `infra/foundry.bicep` and
   `infra-terraform/foundry.tf`. GitHub is optional and must remain disabled
   when both OAuth settings are absent.
+- Google MCP is an explicit opt-in. Keep it disabled unless the enable flag,
+  endpoint, client ID, client secret, and manual toolbox entry are all present.
+  The sample intentionally has no imperative Google cleanup script.
 - Treat APIM named values as administrator-facing policy configuration.
   Persistent default changes belong in both IaC implementations because
   reprovisioning overwrites manual named-value edits.
 - Do not bypass the configured authentication, identity checks, rate limits,
-  token limits, Content Safety, or GitHub user/tool controls to make a test
-  pass.
+  token limits, Content Safety, or GitHub/Google user/tool controls to make a
+  test pass.
 
 ## Development workflow
 
@@ -74,7 +82,8 @@ azd up --no-prompt
 Test deployed traffic through
 `https://<apim-name>.azure-api.net/agent/responses` with a bearer token for
 `https://ai.azure.com/`. If GitHub MCP is enabled, update its OAuth App callback
-to the exported `GITHUB_OAUTH_REDIRECT_URL` before testing the tool.
+to the exported `GITHUB_OAUTH_REDIRECT_URL` before testing the tool. Follow
+`docs/google/README.md` for every manual Google MCP step.
 
 ## Microsoft Foundry Skill
 

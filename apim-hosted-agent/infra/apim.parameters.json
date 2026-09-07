@@ -13,6 +13,9 @@
     "modelApiId": {
       "value": "${AZURE_AI_ACCOUNT_NAME}"
     },
+    "foundryResourceGroupName": {
+      "value": "${AZURE_FOUNDRY_RESOURCE_GROUP}"
+    },
     "foundryProjectName": {
       "value": "${AZURE_AI_PROJECT_NAME}"
     },
@@ -36,6 +39,24 @@
     },
     "githubBlockedToolNames": {
       "value": "${GITHUB_BLOCKED_TOOL_NAMES=}"
+    },
+    "googleMcpEnabled": {
+      "value": "${GOOGLE_MCP_ENABLED=false}"
+    },
+    "googleMcpEndpoint": {
+      "value": "${GOOGLE_MCP_ENDPOINT=}"
+    },
+    "googleOAuthClientId": {
+      "value": "${GOOGLE_OAUTH_CLIENT_ID=}"
+    },
+    "googleOAuthClientSecret": {
+      "value": "${GOOGLE_OAUTH_CLIENT_SECRET=}"
+    },
+    "googleBlockedEmails": {
+      "value": "${GOOGLE_BLOCKED_EMAILS=}"
+    },
+    "googleBlockedToolNames": {
+      "value": "${GOOGLE_BLOCKED_TOOL_NAMES=}"
     }
   }
 }
