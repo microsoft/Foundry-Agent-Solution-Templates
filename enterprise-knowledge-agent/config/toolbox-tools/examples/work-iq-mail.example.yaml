@@ -5,4 +5,3 @@ server_label: workiq-mail
 server_url: https://agent365.svc.cloud.microsoft/agents/servers/mcp_MailTools
 project_connection_id: ${WORKIQ_MAIL_CONNECTION_NAME}
 require_approval: never
-

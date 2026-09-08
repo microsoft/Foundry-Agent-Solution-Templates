@@ -39,3 +39,29 @@ Fabric IQ requires a published Fabric item. Work IQ Calendar and Mail require de
 Maintained references: [Foundry Toolbox](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/toolbox), [Knowledge sources](https://learn.microsoft.com/azure/search/agentic-knowledge-source-overview), and [Hosted-agent samples](https://github.com/microsoft-foundry/foundry-samples/tree/main/samples/python/hosted-agents).
 
 The synthetic demo Search service/index is the only data source created by this template. All other Search indexes, Fabric items, Work/SharePoint data, MCP servers, APIs, databases, and A2A agents are supplied and retained by the customer. See [data onboarding](data-onboarding.md) for implementation steps.
+
+## Integration support matrix
+
+The following paths have been validated with deployed services. Terraform and Bicep both support the template infrastructure; the table focuses on runtime data flow.
+
+| Data or capability | Validated runtime path | Verified behavior |
+|---|---|---|
+| Synthetic enterprise content | Hosted Agent → Toolbox → Foundry IQ Knowledge Base → Azure AI Search index | Retrieves enterprise content with its source URL. |
+| Customer-owned documents, such as PDF and Word files | Existing customer-owned Azure AI Search index → Search Knowledge Source → Foundry IQ Knowledge Base | Retrieves indexed document content with URL, page, section, file name, and file type metadata. |
+| Microsoft product documentation | Hosted Agent → Toolbox → Foundry IQ Knowledge Base → Microsoft Learn MCP Knowledge Source | Produces a grounded answer with Microsoft Learn citations. |
+| Custom read-only MCP content | Foundry IQ Knowledge Base → custom MCP Knowledge Source | Returns grounded content with an HTTPS URL, reference metadata, and source data. |
+| Current public information | Hosted Agent → Toolbox → Web IQ | Returns current information with an HTTPS citation. |
+| Microsoft 365 content through Work IQ | Hosted Agent → Toolbox → Work IQ using the calling user's identity | Executes user-scoped read operations successfully; Mail and Calendar were validated as representative examples. |
+| Organizational API | Foundry Toolbox → OpenAPI service | Invokes a constrained API and returns structured results. |
+| Database-backed business data | Hosted Agent → Toolbox → constrained OpenAPI service → database | Retrieves selected database content and preserves its source URL. |
+
+For the customer-owned document path above, the customer is responsible for file storage, OCR, text extraction, chunking, synchronization, and indexing. Those ingestion steps are outside this template. The template connects an existing, retrieval-ready Azure AI Search index to the Knowledge Base.
+
+The following supported extension paths have not yet been fully validated end to end in this template:
+
+- Fabric Ontology as a Knowledge Source.
+- Native database Knowledge Sources such as Azure SQL or OneLake. Database access through a constrained OpenAPI service is validated.
+- SharePoint or other Microsoft 365 content composed inside a Knowledge Base. Work IQ through Toolbox peer tools is validated.
+- Customer MCP Knowledge Sources that require authentication. Custom read-only MCP grounding is validated.
+- Direct Hosted Agent → Knowledge Base connectivity without Toolbox.
+- A2A used as a grounding path. A2A delegation through Toolbox is a separate optional capability.

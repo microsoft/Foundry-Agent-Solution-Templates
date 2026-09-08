@@ -84,9 +84,11 @@ A 404 usually indicates the wrong Search service or index. Missing citations usu
 
 Keep synchronization and ACL mapping outside this template. Responses must honor the signed-in user's permissions. Cleanup preserves the SharePoint site, library, synchronized index, and customer connection.
 
-## Work IQ placeholders
+## Optional Work IQ Mail and Calendar
 
-The template provides inactive Mail and Calendar examples but does not create Microsoft 365 data, grant permissions, or assign licenses. The caller needs delegated user identity, tenant-policy access, and Microsoft 365 Copilot Business Chat.
+Add Work IQ Mail or Calendar tools to let the agent access the signed-in user's Microsoft 365 data. The connections use `UserEntraToken`; the user's existing permissions, tenant policies, and service license requirements apply.
+
+First deploy the template using the README. From this folder, use the same azd environment and its matching Terraform or Bicep manifest. Create the connections you need (the commands below add both):
 
 ```powershell
 azd ai connection create workiq-calendar-conn --kind remote-tool --target https://agent365.svc.cloud.microsoft/agents/servers/mcp_CalendarTools --auth-type user-entra-token --audience ea9ffc3e-8a23-4a7d-836d-234d7c7565c1
@@ -95,7 +97,27 @@ azd env set WORKIQ_CALENDAR_CONNECTION_NAME workiq-calendar-conn
 azd env set WORKIQ_MAIL_CONNECTION_NAME workiq-mail-conn
 ```
 
-Copy only the required examples into `config/toolbox-tools/`. During provisioning, the template confirms that each referenced project connection exists. Mail and Calendar access must use a user-authenticated Microsoft 365 channel.
+Activate the examples you need (the commands below enable both), then update the Toolbox and Agent:
+
+```powershell
+Copy-Item config/toolbox-tools/examples/work-iq-mail.example.yaml config/toolbox-tools/30-work-iq-mail.yaml
+Copy-Item config/toolbox-tools/examples/work-iq-calendar.example.yaml config/toolbox-tools/40-work-iq-calendar.yaml
+azd provision --no-prompt
+azd deploy --no-prompt
+```
+
+The template checks that the connections exist and adds their tools to the Toolbox. Cleanup preserves these customer-owned connections. The examples expose read and write operations; `require_approval: never` does not restrict tools to read-only access. Review the operations and approval policy for your application.
+
+### Try the tools
+
+Sign in with `azd auth login`, then invoke the agent or use the Foundry Agent Playground. The template's `FoundryToolbox` forwards the caller context automatically. No user token needs to be added to code or environment variables, and `--user-identity` is not needed when using your own signed-in identity.
+
+```powershell
+azd ai agent invoke enterprise-knowledge-agent --new-conversation 'Use Work IQ Mail to summarize my latest email.'
+azd ai agent invoke enterprise-knowledge-agent --new-conversation 'Use Work IQ Calendar to list my upcoming events for tomorrow.'
+```
+
+If a call fails, inspect `azd ai agent monitor enterprise-knowledge-agent`. For an explicit license error such as `M365_COPILOT_BUSINESS_CHAT`, contact your Microsoft 365 administrator or internal IT team to check your assigned licenses. A generic `Function failed` message alone does not identify a license or consent issue.
 
 ## Databases, APIs, MCP, and A2A
 
