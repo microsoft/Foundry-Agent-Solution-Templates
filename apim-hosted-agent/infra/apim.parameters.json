@@ -13,9 +13,6 @@
     "modelApiId": {
       "value": "${AZURE_AI_ACCOUNT_NAME}"
     },
-    "foundryResourceGroupName": {
-      "value": "${AZURE_FOUNDRY_RESOURCE_GROUP}"
-    },
     "foundryProjectName": {
       "value": "${AZURE_AI_PROJECT_NAME}"
     },

@@ -1,7 +1,7 @@
 resource "azapi_resource" "apim" {
   type      = "Microsoft.ApiManagement/service@2024-05-01"
   name      = local.effective_apim_name
-  parent_id = azurerm_resource_group.current.id
+  parent_id = data.azurerm_resource_group.current.id
   location  = var.location
 
   body = {
@@ -34,6 +34,21 @@ resource "azapi_resource" "apim" {
   }
 
   response_export_values = ["identity.principalId"]
+
+  lifecycle {
+    precondition {
+      condition     = !local.google_requested || local.google_configuration_complete
+      error_message = "Google MCP is enabled, but its required configuration is incomplete."
+    }
+
+    precondition {
+      condition = !local.google_requested || can(regex(
+        "^https://[^/?#[:space:]]+(/[^?#[:space:]]*)*/mcp$",
+        lower(trimspace(var.google_mcp_endpoint))
+      ))
+      error_message = "Google MCP endpoint must be an absolute HTTPS URL ending in /mcp."
+    }
+  }
 }
 
 resource "azapi_resource" "policy_named_value" {

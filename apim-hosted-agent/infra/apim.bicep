@@ -23,9 +23,6 @@ param publisherEmail string
 @description('APIM API ID used by the associated model gateway.')
 param modelApiId string
 
-@description('Resource group that contains the Microsoft Foundry account and project.')
-param foundryResourceGroupName string
-
 @description('Microsoft Foundry project name used in the governed tool route.')
 param foundryProjectName string
 
@@ -107,6 +104,10 @@ param contentSafetySexualThreshold int = 7
 param contentSafetyViolenceThreshold int = 7
 param contentSafetyPromptShieldEnabled bool = true
 
+var cognitiveServicesUserRoleDefinitionId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'a97b65f3-24c7-4388-baec-2e87135dc908'
+)
 var effectiveApimName = empty(apimName)
   ? 'apim-${uniqueString(subscription().id, resourceGroup().id)}'
   : apimName
@@ -114,7 +115,25 @@ var githubEnabled = !empty(githubOAuthClientId) && !empty(githubOAuthClientSecre
 var githubMcpGatewayUrl = 'https://${effectiveApimName}.azure-api.net/tool-${toLower(foundryProjectName)}-github-mcp'
 var effectiveGithubBlockedUserNames = empty(githubBlockedUserNames) ? '__none__' : githubBlockedUserNames
 var effectiveGithubBlockedToolNames = empty(githubBlockedToolNames) ? '__none__' : githubBlockedToolNames
-var googleEnabled = toLower(googleMcpEnabled) == 'true' && !empty(googleMcpEndpoint) && !empty(googleOAuthClientId) && !empty(googleOAuthClientSecret)
+var normalizedGoogleMcpEnabled = toLower(googleMcpEnabled)
+var googleEnabledValueValid = contains([
+  'false'
+  'true'
+], normalizedGoogleMcpEnabled)
+var googleEnabledRequested = normalizedGoogleMcpEnabled == 'true'
+var googleConfigurationComplete = googleEnabledRequested && !empty(googleMcpEndpoint) && !empty(googleOAuthClientId) && !empty(googleOAuthClientSecret)
+var normalizedGoogleMcpEndpoint = toLower(trim(googleMcpEndpoint))
+var googleEndpointAuthority = split(replace(normalizedGoogleMcpEndpoint, 'https://', ''), '/')[0]
+var googleEndpointValid = googleEnabledRequested && startsWith(normalizedGoogleMcpEndpoint, 'https://') && !empty(googleEndpointAuthority) && !contains(normalizedGoogleMcpEndpoint, ' ') && !contains(normalizedGoogleMcpEndpoint, '\t') && !contains(normalizedGoogleMcpEndpoint, '\r') && !contains(normalizedGoogleMcpEndpoint, '\n') && !contains(normalizedGoogleMcpEndpoint, '?') && !contains(normalizedGoogleMcpEndpoint, '#') && endsWith(normalizedGoogleMcpEndpoint, '/mcp')
+var googleEnabled = !googleEnabledValueValid
+  ? fail('googleMcpEnabled must be true or false.')
+  : googleEnabledRequested
+  ? !googleConfigurationComplete
+    ? fail('Google MCP is enabled, but its required configuration is incomplete.')
+    : !googleEndpointValid
+      ? fail('Google MCP endpoint must be an absolute HTTPS URL ending in /mcp.')
+      : true
+  : false
 var googleMcpGatewayUrl = 'https://${effectiveApimName}.azure-api.net/tool-${toLower(foundryProjectName)}-google-mcp'
 var effectiveGoogleBlockedEmails = empty(googleBlockedEmails) ? '__none__' : googleBlockedEmails
 var effectiveGoogleBlockedToolNames = empty(googleBlockedToolNames) ? '__none__' : googleBlockedToolNames
@@ -209,7 +228,6 @@ resource policyNamedValueResources 'Microsoft.ApiManagement/service/namedValues@
 }]
 
 resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
-  scope: resourceGroup(foundryResourceGroupName)
   name: modelApiId
 }
 
@@ -228,12 +246,13 @@ resource agentPrincipalNamedValue 'Microsoft.ApiManagement/service/namedValues@2
   }
 }
 
-module apimCognitiveServicesUser 'modules/foundry-account-role.bicep' = {
-  name: 'foundry-account-role'
-  scope: resourceGroup(foundryResourceGroupName)
-  params: {
-    foundryAccountName: modelApiId
-    apimPrincipalId: apim.identity.principalId
+resource apimCognitiveServicesUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: foundryAccount
+  name: guid(foundryAccount.id, apim.id, cognitiveServicesUserRoleDefinitionId)
+  properties: {
+    principalId: apim.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: cognitiveServicesUserRoleDefinitionId
   }
 }
 
@@ -298,7 +317,6 @@ module model 'modules/apim-model.bicep' = {
   params: {
     apimName: apim.name
     foundryAccountName: modelApiId
-    foundryResourceGroupName: foundryResourceGroupName
     foundryProjectName: foundryProjectName
     modelDeploymentName: modelDeploymentName
     tenantId: tenant().tenantId

@@ -91,12 +91,11 @@ function Repair-ResourceLink(
 
 $subscriptionId = Get-AzdValue 'AZURE_SUBSCRIPTION_ID'
 $resourceGroup = Get-AzdValue 'AZURE_RESOURCE_GROUP'
-$foundryResourceGroup = Get-AzdValue 'AZURE_FOUNDRY_RESOURCE_GROUP'
 $accountName = Get-AzdValue 'AZURE_AI_ACCOUNT_NAME'
 $projectName = Get-AzdValue 'AZURE_AI_PROJECT_NAME'
 $apimName = Get-AzdValue 'APIM_NAME'
 $productName = Get-AzdValue 'APIM_FOUNDRY_PRODUCT_NAME'
-$accountId = "/subscriptions/$subscriptionId/resourceGroups/$foundryResourceGroup/providers/Microsoft.CognitiveServices/accounts/$accountName"
+$accountId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.CognitiveServices/accounts/$accountName"
 $projectId = "$accountId/projects/$projectName"
 $apimId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.ApiManagement/service/$apimName"
 $productId = "$apimId/products/$productName"

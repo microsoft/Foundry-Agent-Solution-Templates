@@ -4,12 +4,7 @@ variable "subscription_id" {
 }
 
 variable "resource_group_name" {
-  description = "Resource group that contains API Management."
-  type        = string
-}
-
-variable "foundry_resource_group_name" {
-  description = "Resource group that contains the Microsoft Foundry account and project."
+  description = "Existing azd resource group created by the Foundry layer."
   type        = string
 }
 

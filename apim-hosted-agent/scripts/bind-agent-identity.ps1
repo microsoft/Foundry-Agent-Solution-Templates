@@ -17,11 +17,10 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($principalId)) {
 
 $subscriptionId = Get-AzdValue 'AZURE_SUBSCRIPTION_ID'
 $resourceGroup = Get-AzdValue 'AZURE_RESOURCE_GROUP'
-$foundryResourceGroup = Get-AzdValue 'AZURE_FOUNDRY_RESOURCE_GROUP'
 $accountName = Get-AzdValue 'AZURE_AI_ACCOUNT_NAME'
 $apimName = Get-AzdValue 'APIM_NAME'
 $foundryUserRoleDefinitionId = "/subscriptions/$subscriptionId/providers/Microsoft.Authorization/roleDefinitions/53ca6127-db72-4b80-b1b0-d745d6d5456d"
-$foundryAccountId = "/subscriptions/$subscriptionId/resourceGroups/$foundryResourceGroup/providers/Microsoft.CognitiveServices/accounts/$accountName"
+$foundryAccountId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.CognitiveServices/accounts/$accountName"
 $namedValueId = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.ApiManagement/service/$apimName/namedValues/foundry-agent-principal-id"
 
 $foundryUserAssignments = @(& az role assignment list `

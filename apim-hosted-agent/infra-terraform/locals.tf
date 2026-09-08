@@ -1,8 +1,8 @@
 locals {
-  foundry_account_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.foundry_resource_group_name}/providers/Microsoft.CognitiveServices/accounts/${var.foundry_account_name}"
+  foundry_account_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.CognitiveServices/accounts/${var.foundry_account_name}"
   foundry_project_id = "${local.foundry_account_id}/projects/${var.foundry_project_name}"
   effective_apim_name = var.apim_name != "" ? var.apim_name : "apim-${substr(
-    md5("${var.subscription_id}${azurerm_resource_group.current.id}"),
+    md5("${var.subscription_id}${data.azurerm_resource_group.current.id}"),
     0,
     13
   )}"
@@ -11,13 +11,14 @@ locals {
     var.github_oauth_client_id != "" &&
     nonsensitive(var.github_oauth_client_secret != "")
   )
-  google_enabled = (
-    lower(var.google_mcp_enabled) == "true" &&
+  google_requested = lower(var.google_mcp_enabled) == "true"
+  google_configuration_complete = (
     var.google_mcp_endpoint != "" &&
     var.google_oauth_client_id != "" &&
     nonsensitive(var.google_oauth_client_secret != "")
   )
-  policy_dir = "${path.module}/policies"
+  google_enabled = local.google_requested
+  policy_dir     = "${path.module}/policies"
 
   policy_named_values = merge({
     policy-user-tokens-per-minute               = tostring(var.model_user_tokens_per_minute)
