@@ -71,7 +71,10 @@ azd auth login
 ### 2. Create an azd environment
 
 Choose a new environment name, subscription, APIM name, and publisher details.
-Use the environment name as the resource-group name.
+The Microsoft Foundry provisioning layer creates the resource group and exports
+its actual name to `AZURE_RESOURCE_GROUP`. Do not set `AZURE_RESOURCE_GROUP`
+before provisioning; doing so can make later Bicep or Terraform layers target a
+different resource group from the Foundry account and project.
 
 Before running any `azd` command, select the IaC manifest. Bicep is active by
 default. For Terraform development, temporarily swap the manifests:
@@ -101,7 +104,6 @@ azd env new $environmentName `
   --subscription $subscriptionId `
   --location $location
 
-azd env set AZURE_RESOURCE_GROUP $environmentName
 azd env set APIM_NAME $apimName
 azd env set APIM_PUBLISHER_EMAIL $publisherEmail
 azd env set APIM_PUBLISHER_NAME $publisherName
@@ -122,7 +124,7 @@ azd env select $environmentName
 > then use its client ID and secret in the commands above. Step 4 replaces the
 > temporary callback with the connection's generated redirect URL.
 
-### 3. Provision and deploy
+### 3. Provision the infrastructure
 
 Choose one infrastructure entry point:
 
@@ -132,18 +134,32 @@ Choose one infrastructure entry point:
   plus an Azure CLI sign-in.
 
 ```powershell
-azd up --no-prompt
+azd provision --no-prompt
 ```
 
-The custom `up` workflow first provisions the resource group, Foundry
-account/project/model, Learn connection, RBAC, and APIM service, backends, APIs,
-policies, named values, and resource links. It then deploys the toolbox and
-hosted agent. When both GitHub OAuth values are configured, provisioning also
-creates the GitHub APIM resources and Foundry connection. The connections are
-declared in `infra/foundry.bicep` for Bicep and `infra-terraform/foundry.tf` for
+Provisioning creates the Foundry resource group, account, project, model, Learn
+connection, RBAC, APIM service, backends, APIs, policies, named values, and
+resource links. When both GitHub OAuth values are configured, it also creates
+the GitHub APIM resources and Foundry connection. The connections are declared
+in `infra/foundry.bicep` for Bicep and `infra-terraform/foundry.tf` for
 Terraform. The postprovision hook canonicalizes resource links.
 Each IaC version keeps its policy XML locally under `infra/policies` or
 `infra-terraform/policies`.
+
+Confirm that azd received the resource-group name exported by the Foundry
+layer, and that both values are identical:
+
+```powershell
+$resourceGroup = (azd env get-value AZURE_RESOURCE_GROUP).Trim()
+$foundryResourceGroup = (azd env get-value AZURE_FOUNDRY_RESOURCE_GROUP).Trim()
+
+if ([string]::IsNullOrWhiteSpace($resourceGroup) -or
+    $resourceGroup -ne $foundryResourceGroup) {
+  throw "Foundry and APIM resource-group values do not match."
+}
+
+$resourceGroup
+```
 
 > [!NOTE]
 > To deploy without GitHub, remove the GitHub object from
@@ -170,7 +186,19 @@ because it does not contain the OAuth `state` parameter.
 
 For deployments without GitHub, skip this step.
 
-### 5. Test the agent
+### 5. Deploy the toolbox and hosted agent
+
+After saving the GitHub callback URL, or immediately after provisioning when
+GitHub is disabled, deploy the services:
+
+```powershell
+azd deploy --no-prompt
+azd ai agent show --output json
+```
+
+The agent is ready when its deployed version reports `active` or `deployed`.
+
+### 6. Test the agent
 
 Call the governed agent through APIM:
 

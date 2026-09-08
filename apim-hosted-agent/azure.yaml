@@ -6,7 +6,6 @@ requiredVersions:
         azure.ai.connections: ">=1.0.0-beta.4"
         azure.ai.toolboxes: ">=1.0.0-beta.5"
 name: apim-hosted-agent
-resourceGroup: ${AZURE_RESOURCE_GROUP}
 metadata:
     template: apim-hosted-agent@v1
 hooks:
