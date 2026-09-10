@@ -18,35 +18,9 @@ Review [Cost planning](docs/cost.md) and [customer data onboarding](docs/data-on
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    User[User or application] --> Foundry[Microsoft Foundry<br/>Hosted Knowledge Agent]
-    Foundry -->|Default| Toolbox[Foundry Toolbox]
-    Toolbox -->|Default| IQ[Foundry IQ<br/>Knowledge Base]
-    Foundry -.->|Optional direct connection<br/>without Toolbox| IQ
+![Enterprise Knowledge Agent architecture](docs/images/enterprise-knowledge-agent-architecture.png)
 
-    IQ --> Search[Azure AI Search<br/>enterprise index]
-    IQ --> Learn[Microsoft Learn<br/>MCP server]
-    IQ -.-> CustomerSearch[Customer-owned<br/>Search indexes]
-    IQ -.-> MCP[Read-only MCP servers]
-    IQ -.-> Fabric[Fabric IQ<br/>ontology]
-    IQ -.-> WorkIQ[Work IQ]
-    IQ -.-> WebIQ[Web IQ]
-
-    Toolbox -->|Default tool| WebIQ
-    Toolbox -.-> WorkIQ
-    Toolbox -.-> API[Business APIs<br/>OpenAPI]
-    Toolbox -.-> A2A[Remote agents<br/>A2A]
-
-    classDef core fill:#e8f2ff,stroke:#2878c8,color:#111
-    classDef default fill:#eaf7ed,stroke:#3b8f50,color:#111
-    classDef extension fill:#fff4dd,stroke:#c88719,color:#111
-    class Foundry,Toolbox core
-    class IQ,Search,Learn default
-    class CustomerSearch,MCP,Fabric,WorkIQ,WebIQ,API,A2A extension
-```
-
-Solid lines show the default template; dashed lines show optional extensions. See [Architecture](docs/architecture.md) for connection details and the Toolbox-free Foundry IQ option.
+Solid lines show the default template; dashed lines show optional extensions. See [Architecture](docs/architecture.md) for connection details.
 
 ## Deploy
 
