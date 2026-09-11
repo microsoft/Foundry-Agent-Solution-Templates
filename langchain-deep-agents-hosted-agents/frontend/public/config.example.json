@@ -1,0 +1,5 @@
+{
+  "agentName": "langgraph-deep-agents",
+  "apiBaseUrl": "/api",
+  "environment": "local"
+}

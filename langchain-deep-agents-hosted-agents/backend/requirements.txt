@@ -1,0 +1,6 @@
+azure-ai-projects>=2.4.0,<3
+azure-cosmos>=4.9,<5
+azure-identity>=1.25,<2
+fastapi>=0.116,<1
+pydantic-settings>=2.10,<3
+uvicorn[standard]>=0.35,<1
