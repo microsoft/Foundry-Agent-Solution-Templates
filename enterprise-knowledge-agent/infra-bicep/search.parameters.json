@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceGroupName": { "value": "${AZURE_FOUNDRY_RESOURCE_GROUP}" },
+    "searchServiceName": { "value": "${AZURE_SEARCH_SERVICE_NAME=}" },
+    "searchLocation": { "value": "${AZURE_SEARCH_LOCATION=westus2}" },
+    "searchSku": { "value": "${AZURE_SEARCH_SKU=basic}" },
+    "principalId": { "value": "${AZURE_PRINCIPAL_ID}" },
+    "searchMode": { "value": "${AZURE_SEARCH_MODE=demo}" },
+    "existingSearchEndpoint": { "value": "${AZURE_SEARCH_ENDPOINT=}" },
+    "existingSearchServiceId": { "value": "${AZURE_SEARCH_SERVICE_ID=}" }
+  }
+}
