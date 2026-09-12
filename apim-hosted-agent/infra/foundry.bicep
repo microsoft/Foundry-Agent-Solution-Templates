@@ -19,11 +19,38 @@ param githubOAuthClientId string = ''
 @description('Optional GitHub OAuth App client secret. The GitHub connection is created only when both OAuth values are set.')
 param githubOAuthClientSecret string = ''
 
+@description('Explicit Google MCP opt-in. The Google connection is created only when this is true and all required Google values are set.')
+param googleMcpEnabled string = 'false'
+
+@description('Governed Google MCP endpoint exposed by API Management.')
+param googleMcpUrl string = ''
+
+@description('Optional Google Web application OAuth client ID.')
+param googleOAuthClientId string = ''
+
+@secure()
+@description('Optional Google Web application OAuth client secret.')
+param googleOAuthClientSecret string = ''
+
 var foundryUserRoleDefinitionId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '53ca6127-db72-4b80-b1b0-d745d6d5456d'
 )
 var githubEnabled = !empty(githubMcpUrl) && !empty(githubOAuthClientId) && !empty(githubOAuthClientSecret)
+var normalizedGoogleMcpEnabled = toLower(googleMcpEnabled)
+var googleEnabledValueValid = contains([
+  'false'
+  'true'
+], normalizedGoogleMcpEnabled)
+var googleEnabledRequested = normalizedGoogleMcpEnabled == 'true'
+var googleConfigurationComplete = googleEnabledRequested && !empty(googleMcpUrl) && !empty(googleOAuthClientId) && !empty(googleOAuthClientSecret)
+var googleEnabled = !googleEnabledValueValid
+  ? fail('googleMcpEnabled must be true or false.')
+  : googleEnabledRequested
+  ? !googleConfigurationComplete
+    ? fail('Google MCP is enabled, but its required configuration is incomplete.')
+    : true
+  : false
 
 resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
   name: foundryAccountName
@@ -91,5 +118,38 @@ resource githubConnection 'Microsoft.CognitiveServices/accounts/projects/connect
   ]
 }
 
+resource googleConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (googleEnabled) {
+  parent: foundryProject
+  name: 'google'
+  properties: {
+    target: googleMcpUrl
+    authType: 'OAuth2'
+    category: 'RemoteTool'
+    peRequirement: 'NotRequired'
+    credentials: {
+      clientId: googleOAuthClientId
+      clientSecret: googleOAuthClientSecret
+    }
+    #disable-next-line BCP037
+    authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth'
+    #disable-next-line BCP037
+    tokenUrl: 'https://oauth2.googleapis.com/token'
+    #disable-next-line BCP037
+    refreshUrl: 'https://oauth2.googleapis.com/token'
+    #disable-next-line BCP037
+    scopes: [
+      'openid'
+      'https://www.googleapis.com/auth/userinfo.email'
+      'https://www.googleapis.com/auth/userinfo.profile'
+    ]
+  }
+  dependsOn: [
+    learnConnection
+  ]
+}
+
 @description('Generated OAuth redirect URL for the GitHub MCP connection.')
 output GITHUB_OAUTH_REDIRECT_URL string = githubEnabled ? any(githubConnection!).properties.redirectUrl : ''
+
+@description('Generated OAuth redirect URL for the Google MCP connection.')
+output GOOGLE_OAUTH_REDIRECT_URL string = googleEnabled ? any(googleConnection!).properties.redirectUrl : ''

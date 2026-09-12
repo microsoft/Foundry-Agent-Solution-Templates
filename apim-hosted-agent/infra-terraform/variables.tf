@@ -153,6 +153,48 @@ variable "github_blocked_tool_names" {
   default     = ""
 }
 
+variable "google_mcp_enabled" {
+  description = "Explicit Google MCP opt-in."
+  type        = string
+  default     = "false"
+
+  validation {
+    condition     = contains(["false", "true"], lower(var.google_mcp_enabled))
+    error_message = "google_mcp_enabled must be true or false."
+  }
+}
+
+variable "google_mcp_endpoint" {
+  description = "Optional Google OAuth-protected MCP HTTPS endpoint ending in /mcp."
+  type        = string
+  default     = ""
+}
+
+variable "google_oauth_client_id" {
+  description = "Optional Google Web application OAuth client ID."
+  type        = string
+  default     = ""
+}
+
+variable "google_oauth_client_secret" {
+  description = "Optional Google Web application OAuth client secret."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "google_blocked_emails" {
+  description = "Optional comma-separated Google email addresses denied access to the Google MCP route."
+  type        = string
+  default     = ""
+}
+
+variable "google_blocked_tool_names" {
+  description = "Optional comma-separated Google MCP tool names denied by APIM."
+  type        = string
+  default     = ""
+}
+
 variable "content_safety_hate_threshold" {
   type    = number
   default = 7

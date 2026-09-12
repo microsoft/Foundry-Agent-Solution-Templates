@@ -18,6 +18,18 @@
     },
     "githubOAuthClientSecret": {
       "value": "${GITHUB_OAUTH_CLIENT_SECRET}"
+    },
+    "googleMcpEnabled": {
+      "value": "${GOOGLE_MCP_ENABLED=false}"
+    },
+    "googleMcpUrl": {
+      "value": "${GOOGLE_MCP_URL=}"
+    },
+    "googleOAuthClientId": {
+      "value": "${GOOGLE_OAUTH_CLIENT_ID=}"
+    },
+    "googleOAuthClientSecret": {
+      "value": "${GOOGLE_OAUTH_CLIENT_SECRET=}"
     }
   }
 }

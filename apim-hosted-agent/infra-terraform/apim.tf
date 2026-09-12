@@ -34,6 +34,21 @@ resource "azapi_resource" "apim" {
   }
 
   response_export_values = ["identity.principalId"]
+
+  lifecycle {
+    precondition {
+      condition     = !local.google_requested || local.google_configuration_complete
+      error_message = "Google MCP is enabled, but its required configuration is incomplete."
+    }
+
+    precondition {
+      condition = !local.google_requested || can(regex(
+        "^https://[^/?#[:space:]]+(/[^?#[:space:]]*)*/mcp$",
+        lower(trimspace(var.google_mcp_endpoint))
+      ))
+      error_message = "Google MCP endpoint must be an absolute HTTPS URL ending in /mcp."
+    }
+  }
 }
 
 resource "azapi_resource" "policy_named_value" {
@@ -197,6 +212,23 @@ module "github_tool" {
   apim_name            = azapi_resource.apim.name
   foundry_project_name = var.foundry_project_name
   policy               = file("${local.policy_dir}/foundry-tool-github-mcp-policy.xml")
+
+  depends_on = [
+    azapi_resource.policy_named_value,
+    azapi_resource.tool_content_safety_policy_fragment,
+    azurerm_role_assignment.apim_cognitive_services_user,
+  ]
+}
+
+module "google_tool" {
+  count  = local.google_enabled ? 1 : 0
+  source = "./modules/apim-tool-google"
+
+  apim_id              = azapi_resource.apim.id
+  apim_name            = azapi_resource.apim.name
+  foundry_project_name = var.foundry_project_name
+  google_mcp_endpoint  = var.google_mcp_endpoint
+  policy               = file("${local.policy_dir}/foundry-tool-google-mcp-policy.xml")
 
   depends_on = [
     azapi_resource.policy_named_value,

@@ -71,6 +71,25 @@ param githubBlockedUserNames string = ''
 @description('Optional comma-separated GitHub MCP tool names denied by APIM. Matching is case-insensitive.')
 param githubBlockedToolNames string = ''
 
+@description('Explicit Google MCP opt-in. Google resources are created only when this is true and all required Google values are set.')
+param googleMcpEnabled string = 'false'
+
+@description('Optional Google MCP HTTPS endpoint ending in /mcp.')
+param googleMcpEndpoint string = ''
+
+@description('Optional Google Web application OAuth client ID.')
+param googleOAuthClientId string = ''
+
+@secure()
+@description('Optional Google Web application OAuth client secret.')
+param googleOAuthClientSecret string = ''
+
+@description('Optional comma-separated Google email addresses denied access to the Google MCP route. Matching is case-insensitive.')
+param googleBlockedEmails string = ''
+
+@description('Optional comma-separated Google MCP tool names denied by APIM. Matching is case-insensitive.')
+param googleBlockedToolNames string = ''
+
 @minValue(0)
 @maxValue(7)
 param contentSafetyHateThreshold int = 7
@@ -96,7 +115,29 @@ var githubEnabled = !empty(githubOAuthClientId) && !empty(githubOAuthClientSecre
 var githubMcpGatewayUrl = 'https://${effectiveApimName}.azure-api.net/tool-${toLower(foundryProjectName)}-github-mcp'
 var effectiveGithubBlockedUserNames = empty(githubBlockedUserNames) ? '__none__' : githubBlockedUserNames
 var effectiveGithubBlockedToolNames = empty(githubBlockedToolNames) ? '__none__' : githubBlockedToolNames
-var policyNamedValues = [
+var normalizedGoogleMcpEnabled = toLower(googleMcpEnabled)
+var googleEnabledValueValid = contains([
+  'false'
+  'true'
+], normalizedGoogleMcpEnabled)
+var googleEnabledRequested = normalizedGoogleMcpEnabled == 'true'
+var googleConfigurationComplete = googleEnabledRequested && !empty(googleMcpEndpoint) && !empty(googleOAuthClientId) && !empty(googleOAuthClientSecret)
+var normalizedGoogleMcpEndpoint = toLower(trim(googleMcpEndpoint))
+var googleEndpointAuthority = split(replace(normalizedGoogleMcpEndpoint, 'https://', ''), '/')[0]
+var googleEndpointValid = googleEnabledRequested && startsWith(normalizedGoogleMcpEndpoint, 'https://') && !empty(googleEndpointAuthority) && !contains(normalizedGoogleMcpEndpoint, ' ') && !contains(normalizedGoogleMcpEndpoint, '\t') && !contains(normalizedGoogleMcpEndpoint, '\r') && !contains(normalizedGoogleMcpEndpoint, '\n') && !contains(normalizedGoogleMcpEndpoint, '?') && !contains(normalizedGoogleMcpEndpoint, '#') && endsWith(normalizedGoogleMcpEndpoint, '/mcp')
+var googleEnabled = !googleEnabledValueValid
+  ? fail('googleMcpEnabled must be true or false.')
+  : googleEnabledRequested
+  ? !googleConfigurationComplete
+    ? fail('Google MCP is enabled, but its required configuration is incomplete.')
+    : !googleEndpointValid
+      ? fail('Google MCP endpoint must be an absolute HTTPS URL ending in /mcp.')
+      : true
+  : false
+var googleMcpGatewayUrl = 'https://${effectiveApimName}.azure-api.net/tool-${toLower(foundryProjectName)}-google-mcp'
+var effectiveGoogleBlockedEmails = empty(googleBlockedEmails) ? '__none__' : googleBlockedEmails
+var effectiveGoogleBlockedToolNames = empty(googleBlockedToolNames) ? '__none__' : googleBlockedToolNames
+var policyNamedValues = concat([
   {
     name: 'policy-user-tokens-per-minute'
     value: string(modelUserTokensPerMinute)
@@ -134,7 +175,16 @@ var policyNamedValues = [
   { name: 'policy-content-safety-sexual-threshold', value: string(contentSafetySexualThreshold) }
   { name: 'policy-content-safety-violence-threshold', value: string(contentSafetyViolenceThreshold) }
   { name: 'policy-content-safety-prompt-shield-enabled', value: string(contentSafetyPromptShieldEnabled) }
-]
+], googleEnabled ? [
+  {
+    name: 'policy-google-blocked-emails'
+    value: effectiveGoogleBlockedEmails
+  }
+  {
+    name: 'policy-google-blocked-tools'
+    value: effectiveGoogleBlockedToolNames
+  }
+] : [])
 
 resource apim 'Microsoft.ApiManagement/service@2024-05-01' = {
   name: effectiveApimName
@@ -306,6 +356,20 @@ module githubTool 'modules/apim-tool-github.bicep' = if (githubEnabled) {
   ]
 }
 
+module googleTool 'modules/apim-tool-google.bicep' = if (googleEnabled) {
+  name: 'tool-google'
+  params: {
+    apimName: apim.name
+    foundryProjectName: foundryProjectName
+    googleMcpEndpoint: googleMcpEndpoint
+  }
+  dependsOn: [
+    policyNamedValueResources
+    toolContentSafetyPolicyFragment
+    apimCognitiveServicesUser
+  ]
+}
+
 output APIM_NAME string = apim.name
 output APIM_RESOURCE_ID string = apim.id
 output APIM_GATEWAY_URL string = 'https://${apim.name}.azure-api.net'
@@ -318,3 +382,5 @@ output APIM_FOUNDRY_SUBSCRIPTION_NAME string = model.outputs.productSubscription
 output MSLEARN_MCP_URL string = learnTool.outputs.gatewayUrl
 output GITHUB_MCP_ENABLED bool = githubEnabled
 output GITHUB_MCP_URL string = githubEnabled ? githubMcpGatewayUrl : ''
+output GOOGLE_MCP_ENABLED bool = googleEnabled
+output GOOGLE_MCP_URL string = googleEnabled ? googleMcpGatewayUrl : ''
