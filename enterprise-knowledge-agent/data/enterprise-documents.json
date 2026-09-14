@@ -1,0 +1,5 @@
+[
+  {"id":"travel-policy","title":"Contoso Travel Policy","content":"For Project Northstar, the internal travel approval code is NS-4827. International travel requires director approval at least 14 calendar days before departure.","source_url":"https://contoso.example/policies/travel"},
+  {"id":"support-policy","title":"Contoso Support Policy","content":"Priority-one incidents use the internal escalation phrase Blue Lantern and require an incident commander within 15 minutes.","source_url":"https://contoso.example/policies/support"},
+  {"id":"retention-policy","title":"Contoso Data Retention","content":"Synthetic customer case exports are retained for 30 days in the Atlas test environment.","source_url":"https://contoso.example/policies/retention"}
+]

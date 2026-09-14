@@ -1,0 +1,12 @@
+# BYO: deploy and secure the read-only MCP server before enabling this file.
+name: customer-mcp-ks
+kind: mcpServer
+description: Customer-provided read-only MCP grounding source.
+mcpServerParameters:
+  serverURL: ${CUSTOMER_MCP_ENDPOINT}
+  tools:
+    - name: ${CUSTOMER_MCP_TOOL_NAME}
+      outputParsing:
+        kind: auto
+      maxOutputTokens: 1500
+

@@ -1,0 +1,4 @@
+azure-identity==1.25.3
+PyYAML==6.0.3
+requests==2.34.2
+

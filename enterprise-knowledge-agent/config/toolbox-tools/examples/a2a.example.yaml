@@ -1,0 +1,6 @@
+# BYO: the remote A2A agent and project connection must already exist.
+name: customer-agent
+type: a2a_preview
+project_connection_id: ${CUSTOMER_A2A_CONNECTION_NAME}
+agent_card_path: ${CUSTOMER_A2A_AGENT_CARD_PATH}
+

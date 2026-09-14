@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+requiredVersions:
+  azd: '>=1.32.0'
+  extensions:
+    azure.ai.agents: '>=1.0.0-beta.9'
+    azure.ai.connections: '>=1.0.0-beta.4'
+    azure.ai.toolboxes: '>=1.0.0-beta.5'
+name: enterprise-knowledge-agent-bicep
+metadata:
+  template: enterprise-knowledge-agent-bicep@v1
+hooks:
+  postprovision:
+    shell: pwsh
+    run: ./scripts/postprovision.ps1
+  predown:
+    shell: pwsh
+    run: ./scripts/predown.ps1
+services:
+  ai-project:
+    host: azure.ai.project
+    deployments:
+      - name: gpt-5.4-mini
+        model:
+          format: OpenAI
+          name: gpt-5.4-mini
+          version: '2026-03-17'
+        sku:
+          name: GlobalStandard
+          capacity: 10
+  enterprise-knowledge-agent:
+    host: azure.ai.agent
+    project: src
+    language: python
+    uses: [ai-project]
+    kind: hosted
+    name: enterprise-knowledge-agent
+    displayName: Enterprise Knowledge Agent
+    description: Routes enterprise and Microsoft documentation questions through a composed Foundry IQ knowledge base and current public questions through Web IQ.
+    protocols:
+      - protocol: responses
+        version: 2.0.0
+    environmentVariables:
+      - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+        value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
+      - name: TOOLBOX_ENDPOINT
+        value: ${TOOLBOX_ENDPOINT}
+    codeConfiguration:
+      dependencyResolution: remote_build
+      runtime: python_3_13
+      entryPoint: main.py
+    container:
+      resources:
+        cpu: '0.5'
+        memory: 1Gi
+    hooks:
+      postdeploy:
+        shell: pwsh
+        run: ../scripts/postdeploy.ps1
+infra:
+  layers:
+    - provider: microsoft.foundry
+      path: infra-foundry
+      name: foundry
+    - provider: bicep
+      path: infra-bicep
+      module: search
+      name: search
+      scope: subscription
+      dependsOn:
+        - foundry
+workflows:
+  up:
+    steps:
+      - azd:
+          args:
+            - provision
+      - azd:
+          args:
+            - deploy

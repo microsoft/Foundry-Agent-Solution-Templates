@@ -1,0 +1,8 @@
+# BYO: Fabric capacity, workspace, data, and published ontology are not created here.
+name: customer-fabric-ontology-ks
+kind: fabricOntology
+description: Customer-owned published Fabric ontology for unified grounding.
+fabricOntologyParameters:
+  workspaceId: ${FABRIC_WORKSPACE_ID}
+  ontologyId: ${FABRIC_ONTOLOGY_ID}
+

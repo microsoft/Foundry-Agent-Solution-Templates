@@ -1,0 +1,22 @@
+# BYO: replace the server URL and operations with an existing constrained API.
+name: customer-api
+type: openapi
+openapi:
+  name: customer_api
+  spec:
+    openapi: 3.0.0
+    info:
+      title: Customer API
+      version: 1.0.0
+    servers:
+      - url: ${CUSTOMER_OPENAPI_SERVER_URL}
+    paths:
+      /known-answer:
+        get:
+          operationId: getKnownAnswer
+          description: Return a non-sensitive known-answer fixture.
+          responses:
+            '200':
+              description: Successful response
+  auth:
+    type: anonymous
