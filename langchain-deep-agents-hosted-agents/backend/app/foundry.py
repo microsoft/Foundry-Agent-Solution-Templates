@@ -10,53 +10,12 @@ from azure.identity import DefaultAzureCredential
 
 from .config import Settings
 
-# Keep aligned with https://learn.microsoft.com/azure/foundry/openai/how-to/responses#supported-models.
-_RESPONSES_MODEL_VERSIONS = {
-    ("gpt-6-astra", "2026-09-03"),
-    ("gpt-5.6-sol", "2026-07-09"),
-    ("gpt-5.6-terra", "2026-07-09"),
-    ("gpt-5.6-luna", "2026-07-09"),
-    ("gpt-chat-latest", "2026-08-06"),
-    ("gpt-chat-latest", "2026-06-24"),
-    ("gpt-chat-latest", "2026-05-28"),
-    ("gpt-chat-latest", "2026-05-05"),
-    ("gpt-5.5", "2026-04-24"),
-    ("gpt-5.4", "2026-03-05"),
-    ("gpt-5.4-pro", "2026-03-05"),
-    ("gpt-5.4-mini", "2026-03-17"),
-    ("gpt-5.4-nano", "2026-03-17"),
-    ("gpt-5.3-chat", "2026-03-03"),
-    ("gpt-5.3-codex", "2026-02-24"),
-    ("gpt-5.2-codex", "2026-01-14"),
-    ("gpt-5.2", "2025-12-11"),
-    ("gpt-5.2-chat", "2025-12-11"),
-    ("gpt-5.2-chat", "2026-02-10"),
-    ("gpt-5.1-codex-max", "2025-12-04"),
-    ("gpt-5.1", "2025-11-13"),
-    ("gpt-5.1-chat", "2025-11-13"),
-    ("gpt-5.1-codex", "2025-11-13"),
-    ("gpt-5.1-codex-mini", "2025-11-13"),
-    ("gpt-5-pro", "2025-10-06"),
-    ("gpt-5", "2025-08-07"),
-    ("gpt-5-mini", "2025-08-07"),
-    ("gpt-5-nano", "2025-08-07"),
-    ("gpt-5-chat", "2025-08-07"),
-    ("gpt-5-chat", "2025-10-03"),
-    ("gpt-5-codex", "2025-09-11"),
-    ("gpt-5-codex", "2025-09-15"),
-    ("gpt-4o", "2024-11-20"),
-    ("gpt-4o", "2024-08-06"),
-    ("gpt-4o", "2024-05-13"),
-    ("gpt-4o-mini", "2024-07-18"),
-    ("gpt-4.1", "2025-04-14"),
-    ("gpt-4.1-mini", "2025-04-14"),
-    ("gpt-4.1-nano", "2025-04-14"),
-    ("o1", "2024-12-17"),
-    ("o3-mini", "2025-01-31"),
-    ("o3", "2025-04-16"),
-    ("o4-mini", "2025-04-16"),
-}
 _MODEL_CACHE_SECONDS = 300.0
+
+
+def _supports_text_generation(deployment: ModelDeployment) -> bool:
+    """Return whether a deployment exposes the chat/text generation capability."""
+    return deployment.capabilities.get("chat_completion", "false").lower() == "true"
 
 
 class FoundryService:
@@ -115,7 +74,7 @@ class FoundryService:
             }
             for deployment in deployments
             if isinstance(deployment, ModelDeployment)
-            and (deployment.model_name, deployment.model_version) in _RESPONSES_MODEL_VERSIONS
+            and _supports_text_generation(deployment)
         ]
         self._response_models = sorted(models, key=lambda model: (not model["isDefault"], model["name"]))
         self._response_models_loaded_at = monotonic()

@@ -5,11 +5,12 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
+from azure.ai.projects.models import ModelDeployment, ModelDeploymentSku
 from fastapi.testclient import TestClient
 
 from app.auth import get_user
 from app.config import Settings, get_settings
-from app.foundry import FoundryService
+from app.foundry import FoundryService, _supports_text_generation
 from app.main import app, foundry, is_text_file, store
 from app.models import ConversationMapping, Project, UserContext
 from app.store import InMemoryDomainStore, SqliteDomainStore
@@ -97,6 +98,22 @@ def api() -> tuple[TestClient, FakeFoundryService]:
     with TestClient(app) as client:
         yield client, agent
     app.dependency_overrides.clear()
+
+
+def test_model_capability_filter_excludes_embeddings() -> None:
+    def deployment(capabilities: dict[str, str]) -> ModelDeployment:
+        return ModelDeployment(
+            name="test",
+            model_name="test",
+            model_version="1",
+            model_publisher="OpenAI",
+            capabilities=capabilities,
+            sku=ModelDeploymentSku(name="GlobalStandard", capacity=1),
+        )
+
+    assert _supports_text_generation(deployment({"chat_completion": "true"}))
+    assert _supports_text_generation(deployment({"chat_completion": "TRUE"}))
+    assert not _supports_text_generation(deployment({"embeddings": "true"}))
 
 
 def test_project_conversation_and_shared_session_lifecycle(api: tuple[TestClient, FakeFoundryService]) -> None:
