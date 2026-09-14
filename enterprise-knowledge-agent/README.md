@@ -1,10 +1,10 @@
 # Enterprise Knowledge Agent
 
-An extensible enterprise knowledge assistant that answers questions using organizational content, Microsoft product documentation, and current public web information, with citations to its sources. The template deploys a Microsoft Foundry Hosted Agent with a working synthetic enterprise knowledge index and shows how to connect customer-owned Search indexes, MCP servers, Fabric ontologies, Work IQ tools, business APIs, and other agents.
+An extensible enterprise knowledge assistant that demonstrates Microsoft's IQ capabilities: Foundry IQ for governed enterprise retrieval, Web IQ for current public information, and optional integrations with Fabric IQ and Work IQ. The template deploys a Microsoft Foundry Hosted Agent with a synthetic enterprise knowledge index and uses a recommended Toolbox approach to connect these capabilities alongside customer-owned Search indexes, MCP servers, business APIs, and other agents.
 
 ## What this template is for
 
-- Learn how a Microsoft Foundry Hosted Agent can use one Toolbox for both governed enterprise retrieval and current public information.
+- Learn how a Microsoft Foundry Hosted Agent can use a recommended Toolbox to access Foundry IQ, Web IQ, and optional Fabric IQ and Work IQ capabilities.
 - Deploy a working keyless example with a synthetic Azure AI Search index, Microsoft Learn grounding, citations, and Web IQ.
 - Connect existing customer-owned Search indexes, MCP servers, Fabric ontologies, Work IQ tools, APIs, or remote agents through inactive configuration examples.
 - Use configuration ordering, duplicate detection, external-source preflight, idempotent reprovisioning, and ownership-aware cleanup safeguards.
