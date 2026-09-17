@@ -107,3 +107,49 @@ environments, and locally stored OAuth credentials were removed.
 
 Sanitized command output and timing evidence are retained in the four validation
 session artifacts and are intentionally not committed with this report.
+
+## Follow-up retained and Google validation
+
+A second six-session run used 50 `DataZoneStandard` capacity units per
+environment so the deployments fit within the subscription's 333-unit quota.
+
+### Retained manual-test environments
+
+| Scenario | Resource group | APIM responses endpoint | State |
+| --- | --- | --- | --- |
+| GitHub disabled, Bicep | `rg-manual-nghb-90c838-foundry` | `https://apim-xfh-90c838-mnghb.azure-api.net/agent/responses` | Active; HTTP 200 completed smoke response |
+| GitHub disabled, Terraform | `rg-manual-nght-90c838-foundry` | `https://apim-xfh-90c838-mnght.azure-api.net/agent/responses` | Active; HTTP 200 completed smoke response |
+| GitHub enabled, Bicep | `rg-manual-ghb-90c838-foundry` | `https://apim-xfh-90c838-mghb.azure-api.net/agent/responses` | Active; OAuth consent remains unresolved for manual investigation |
+| GitHub enabled, Terraform | `rg-manual-ght-90c838-foundry` | `https://apim-xfh-90c838-mght.azure-api.net/agent/responses` | Active; OAuth consent links returned 404 during validation |
+
+These four Azure environments and their local azd environments were
+intentionally retained. The GitHub-enabled environments retain their local
+OAuth configuration for manual testing.
+
+### Google MCP validation
+
+Google tool names were removed from the guide before testing. Both providers
+discovered the server inventory at runtime and selected a safe tool only after
+discovery.
+
+| Infrastructure | Result |
+| --- | --- |
+| Bicep | Provision and deploy passed. Hosted-agent authorization succeeded, the runtime selected an advertised arithmetic tool dynamically, and the result was validated without personal output. Direct Toolbox `tools/list` required separate developer-identity consent and was not completed before cleanup. |
+| Terraform | Provision and deploy passed. Authenticated `tools/list` returned the live inventory, a safe advertised arithmetic tool returned the expected result, and no identity-bearing tool was invoked. |
+
+Both Google Azure environments, local azd environments, and locally stored
+Google credentials were deleted after testing. The external Cloud Run service
+and Google OAuth application were not modified by cleanup.
+
+### Follow-up documentation findings
+
+- The Google guide previously used `azd up`, which deploys before the generated
+  OAuth callback can be registered. The guide now uses `azd provision`, callback
+  registration, then `azd deploy`.
+- The previous `store=false` request could not resume the OAuth response.
+  The guide now stores the consent response and resumes it with
+  `previous_response_id`.
+- Google tool validation now uses `tools/list` and an advertised safe tool
+  instead of assuming a fixed inventory.
+- Foundry can require distinct consent for the hosted-agent caller and the
+  developer identity used for direct Toolbox calls.
