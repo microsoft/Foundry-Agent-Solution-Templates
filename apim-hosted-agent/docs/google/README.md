@@ -36,7 +36,8 @@ the server's `ALLOWED_CLIENT_IDS` environment variable with the same Web OAuth
 client ID that will be supplied to Foundry. This audience pin is required even
 though APIM also validates the access token with Google user info.
 
-The reference server exposes `whoami`, `echo`, `add`, and `current_time`. It
+The MCP server defines its own tool inventory. Do not assume specific tool
+names; discover the available tools at runtime after authentication. The server
 must remain reachable from APIM; Cloud Run can allow unauthenticated network
 access because the application itself rejects requests without a valid Google
 bearer token.
@@ -56,7 +57,7 @@ Optional APIM denylists accept comma-separated, case-insensitive exact values:
 
 ```powershell
 azd env set GOOGLE_BLOCKED_EMAILS 'blocked-user@example.com'
-azd env set GOOGLE_BLOCKED_TOOL_NAMES 'echo,current_time'
+azd env set GOOGLE_BLOCKED_TOOL_NAMES '<tool-name-1>,<tool-name-2>'
 ```
 
 Set all values before adding Google to the toolbox. With incomplete values, the
@@ -111,8 +112,7 @@ The deployment creates the following only while Google MCP is enabled:
 
 Call the hosted agent through the APIM agent endpoint and ask it to invoke a
 Google tool. The first request returns an OAuth consent link. Open it, sign in
-as an allowed/test user, grant consent, and continue the response flow. Verify
-all four reference tools: `whoami`, `echo`, `add`, and `current_time`.
+as an allowed/test user, grant consent, and continue the response flow.
 
 Foundry can request consent separately for the developer identity calling the
 toolbox and for the hosted-agent caller context. A direct toolbox test can pass
@@ -121,13 +121,10 @@ link returned by each caller, check **I have verified this request and trust the
 source**, and choose **Allow access**. A successful flow ends on a Microsoft
 Foundry page headed **Authentication successful**.
 
-Use non-personal tools for automated validation:
-
-- `add(2, 40)` returns `42.0` directly and `42` through the hosted agent;
-- `echo` returns the supplied marker;
-- `current_time` returns a live timestamp.
-
-Avoid logging `whoami` output because it contains the signed-in Google identity.
+After consent, discover the server's current inventory with MCP `tools/list`.
+Select an advertised, non-destructive tool whose inputs and output can be
+validated without exposing personal data. Do not invoke tools by an assumed
+name, and do not log identity-bearing tool output.
 
 If consent reports `redirect_uri_mismatch`, compare the Google Web client URI
 with `GOOGLE_OAUTH_REDIRECT_URL`. If the MCP request returns `401`, confirm the

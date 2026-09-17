@@ -58,7 +58,7 @@ You need:
 - **Foundry User** at the subscription scope, or on the new Foundry resource
   before deploying and invoking the agent;
 - Permission and available quota to deploy and use a model in Microsoft Foundry.
-  The example configuration uses `gpt-5.6-luna` version `2026-07-09` with 100
+  The example configuration uses `gpt-5.6-luna` version `2026-07-09` with 50
   Data Zone Standard capacity units.
 
 Sign in to both CLIs with the same tenant:
@@ -71,10 +71,9 @@ azd auth login
 ### 2. Create an azd environment
 
 Choose a new environment name, subscription, APIM name, and publisher details.
-The Microsoft Foundry provisioning layer creates the resource group and exports
-its actual name to `AZURE_RESOURCE_GROUP`. Do not set `AZURE_RESOURCE_GROUP`
-before provisioning; doing so can make later Bicep or Terraform layers target a
-different resource group from the Foundry account and project.
+Set `AZURE_RESOURCE_GROUP` to the Microsoft Foundry layer's deterministic
+`rg-<environment-name>-foundry` resource-group name before provisioning. Both
+the Foundry and APIM layers then target that group.
 
 Before running any `azd` command, select the IaC manifest. Bicep is active by
 default. For Terraform development, temporarily swap the manifests:
@@ -96,6 +95,7 @@ Rename-Item azure-bicep.yaml azure.yaml
 $environmentName = '<environment-name>'
 $subscriptionId = '<subscription-id>'
 $location = 'eastus'
+$resourceGroup = "rg-$environmentName-foundry"
 $apimName = '<globally-unique-apim-name>'
 $publisherEmail = 'you@example.com'
 $publisherName = 'Your organization'
@@ -104,6 +104,7 @@ azd env new $environmentName `
   --subscription $subscriptionId `
   --location $location
 
+azd env set AZURE_RESOURCE_GROUP $resourceGroup
 azd env set APIM_NAME $apimName
 azd env set APIM_PUBLISHER_EMAIL $publisherEmail
 azd env set APIM_PUBLISHER_NAME $publisherName
@@ -146,16 +147,13 @@ Terraform. The postprovision hook canonicalizes resource links.
 Each IaC version keeps its policy XML locally under `infra/policies` or
 `infra-terraform/policies`.
 
-Confirm that azd received the resource-group name exported by the Foundry
-layer, and that both values are identical:
+Confirm that azd retained the selected resource-group name:
 
 ```powershell
 $resourceGroup = (azd env get-value AZURE_RESOURCE_GROUP).Trim()
-$foundryResourceGroup = (azd env get-value AZURE_FOUNDRY_RESOURCE_GROUP).Trim()
 
-if ([string]::IsNullOrWhiteSpace($resourceGroup) -or
-    $resourceGroup -ne $foundryResourceGroup) {
-  throw "Foundry and APIM resource-group values do not match."
+if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
+  throw "AZURE_RESOURCE_GROUP is not set."
 }
 
 $resourceGroup
@@ -303,7 +301,7 @@ Keep `services.project.deployments` in the selected `azure.yaml` aligned with
 
 ### Provisioning fails with `InsufficientQuota`
 
-The example model configuration requests 100 `gpt-5.6-luna` Data Zone Standard
+The example model configuration requests 50 `gpt-5.6-luna` Data Zone Standard
 capacity units. The failure can come from either the Foundry account-count quota
 or the model quota. Inspect both in the selected environment region:
 
