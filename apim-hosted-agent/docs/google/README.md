@@ -119,8 +119,7 @@ enabled:
 ## 5. Test consent and tools
 
 Call the hosted agent through the APIM agent endpoint and ask it to discover
-and use a safe Google tool. Store the consent-producing response so the same
-response can be resumed after browser authorization:
+and use a safe Google tool. Keep each request stateless:
 
 ```powershell
 $token = (az account get-access-token `
@@ -138,7 +137,7 @@ Do not assume any tool name.
 
 $initialBody = @{
   input = $inputText
-  store = $true
+  store = $false
 } | ConvertTo-Json -Compress
 
 $initialJson = $initialBody | curl.exe `
@@ -155,62 +154,31 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $initialResponse = ($initialJson -join "`n") | ConvertFrom-Json
-$responseId = [string]$initialResponse.id
 $consentRequests = @(
   $initialResponse.output |
     Where-Object { $_.type -eq 'oauth_consent_request' }
 )
 
-if ([string]::IsNullOrWhiteSpace($responseId)) {
-  throw 'The initial response did not contain response.id.'
-}
-if ($consentRequests.Count -ne 1 -or
-    [string]::IsNullOrWhiteSpace([string]$consentRequests[0].consent_link)) {
-  throw 'The initial response did not contain exactly one OAuth consent link.'
-}
+if ($consentRequests.Count -gt 0) {
+  if ($consentRequests.Count -ne 1 -or
+      [string]::IsNullOrWhiteSpace([string]$consentRequests[0].consent_link)) {
+    throw 'The response did not contain exactly one usable OAuth consent link.'
+  }
 
-$consentUrl = [string]$consentRequests[0].consent_link
-$responseId
-$consentUrl
+  # Print only the newest link from this response.
+  [string]$consentRequests[0].consent_link
+} else {
+  $initialResponse.status
+  @($initialResponse.output | ForEach-Object { $_.type })
+}
 ```
 
 Open `$consentUrl`, sign in as an allowed/test user, grant consent, and wait for
-**Authentication successful**. Then resume the stored response:
-
-```powershell
-$token = (az account get-access-token `
-  --resource https://ai.azure.com/ `
-  --query accessToken `
-  --output tsv).Trim()
-
-$continuationBody = @{
-  previous_response_id = $responseId
-  input = $inputText
-  store = $true
-} | ConvertTo-Json -Compress
-
-$continuationJson = $continuationBody | curl.exe `
-  --silent `
-  --show-error `
-  --fail-with-body `
-  --request POST $agentGateway `
-  --header "Authorization: Bearer $token" `
-  --header 'Content-Type: application/json' `
-  --data-binary '@-'
-
-if ($LASTEXITCODE -ne 0) {
-  throw "OAuth continuation failed with curl exit code $LASTEXITCODE."
-}
-
-$continuationResponse = ($continuationJson -join "`n") | ConvertFrom-Json
-if (@($continuationResponse.output |
-      Where-Object { $_.type -eq 'oauth_consent_request' }).Count -gt 0) {
-  throw 'OAuth consent was requested again instead of resuming the stored response.'
-}
-
-$continuationResponse.status
-@($continuationResponse.output | ForEach-Object { $_.type })
-```
+**Authentication successful**. Then rerun the preceding request as a new
+independent request. If consent is requested again, use only the new
+`consent_link` returned by that response. Consent URLs are short-lived and
+single-use; never reuse an older URL. Stateless requests do not use
+`previous_response_id`.
 
 Foundry can request consent separately for the developer identity calling the
 toolbox and for the hosted-agent caller context. A direct toolbox test can pass
@@ -224,9 +192,9 @@ Select an advertised, non-destructive tool whose inputs and output can be
 validated without exposing personal data. Do not invoke tools by an assumed
 name, and do not log identity-bearing tool output.
 
-Because the toolbox entry requires approval, the OAuth continuation can next
-return an `mcp_approval_request`. Complete that approval through the client
-experience before expecting tool output.
+Because the toolbox entry requires approval, a request after OAuth can return
+an `mcp_approval_request`. Complete that approval through the client experience
+before expecting tool output.
 
 If consent reports `redirect_uri_mismatch`, compare the Google Web client URI
 with `GOOGLE_OAUTH_REDIRECT_URL`. If the MCP request returns `401`, confirm the

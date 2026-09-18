@@ -146,9 +146,9 @@ and Google OAuth application were not modified by cleanup.
 - The Google guide previously used `azd up`, which deploys before the generated
   OAuth callback can be registered. The guide now uses `azd provision`, callback
   registration, then `azd deploy`.
-- The previous `store=false` request could not resume the OAuth response.
-  The guide now stores the consent response and resumes it with
-  `previous_response_id`.
+- A `store=false` response cannot be resumed with `previous_response_id`.
+  The guide intentionally keeps requests stateless: each retry creates a new
+  response and uses only that response's newest, single-use consent URL.
 - Google tool validation now uses `tools/list` and an advertised safe tool
   instead of assuming a fixed inventory.
 - Foundry can require distinct consent for the hosted-agent caller and the
