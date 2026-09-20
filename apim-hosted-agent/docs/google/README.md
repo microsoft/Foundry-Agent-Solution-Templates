@@ -1,6 +1,6 @@
 # Configure Google MCP in Azure APIM and Foundry
 
-[简体中文](zh-cn/README.md) | [Configure Google OAuth](google-oauth.md)
+[Configure Google OAuth](google-oauth.md)
 
 This guide connects an existing Google OAuth-protected Streamable HTTP MCP
 server to the APIM-hosted Foundry agent. Google MCP is disabled by default.

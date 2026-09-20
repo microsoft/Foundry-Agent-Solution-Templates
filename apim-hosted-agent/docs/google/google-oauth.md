@@ -1,6 +1,6 @@
 # Configure Google OAuth for the Foundry Google MCP connection
 
-[简体中文](zh-cn/google-oauth.md) | [Azure APIM and Foundry guide](README.md)
+[Azure APIM and Foundry guide](README.md)
 
 The OAuth client ID is needed before the external MCP server can validate token
 audiences, but Foundry generates its final callback only after Azure
