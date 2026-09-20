@@ -1,7 +1,7 @@
 # Attribution
 
 The workflow in `src/agent.py` adapts the planner, researcher subagent,
-state-backed files and report structure from LangChain Deep Research. Prompts
+working files and report structure from LangChain Deep Research. Prompts
 are shortened for the fictional evidence exercise; Tavily is replaced with a
 bundled deterministic tool. The model and host use langchain-azure adapters.
 

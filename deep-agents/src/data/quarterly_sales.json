@@ -1,0 +1,6 @@
+[
+  {"product": "Cedar", "quarter": "Q1", "revenue": 120, "cost": 80},
+  {"product": "Cedar", "quarter": "Q2", "revenue": 180, "cost": 100},
+  {"product": "Maple", "quarter": "Q1", "revenue": 150, "cost": 110},
+  {"product": "Maple", "quarter": "Q2", "revenue": 210, "cost": 130}
+]

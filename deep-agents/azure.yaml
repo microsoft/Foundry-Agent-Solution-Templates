@@ -22,7 +22,7 @@ services:
     host: azure.ai.agent
     project: src
     language: python
-    startupCommand: python -m langchain_azure_ai.agents.hosting.run --protocol responses
+    startupCommand: python -m langchain_azure_ai.agents.hosting.run --protocol responses --option resilient_background=true
     uses: [ai-project]
     kind: hosted
     name: deep-agents
@@ -43,7 +43,7 @@ services:
     codeConfiguration:
       dependencyResolution: remote_build
       runtime: python_3_13
-      entryPoint: '-m langchain_azure_ai.agents.hosting.run --protocol responses'
+      entryPoint: '-m langchain_azure_ai.agents.hosting.run --protocol responses --option resilient_background=true'
     container:
       resources:
         cpu: '0.5'
