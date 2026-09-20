@@ -125,10 +125,14 @@ On Linux/macOS use `python3.13` and `.venv/bin/python`. This check drives the
 real graph with a scripted model and an async test-only search stub through
 planning, delegation, cited tool results,
 file writing/reading, report completion, approved/rejected execution (including
-subagents), saved-approval reload with the SDK's local persistent state store,
+subagents), graph rebuild/resume and persisted-approval reload,
 conversation isolation, output offloading and history summarization. It makes
 no Azure calls and does not verify cloud restart recovery or live search quality.
 It also checks SDK runner loading, Toolbox tool selection and startup failures.
-The persistence test advances the SDK local store's clock deterministically:
-its second-resolution timestamps otherwise order simultaneous writes by ID.
-That test does not verify latest-checkpoint ordering in the real service.
+Most checks use `InMemorySaver`. The persisted-approval check uses real local
+SDK storage and serializes checkpoint writes with a 1.1-second delay after
+each write, avoiding the pinned SDK's same-second timestamp ordering defect.
+It remains enabled and verifies the agent pauses before approval, resumes
+after reopening the saver, and actually executes the approved command. This
+test-only pacing neither mocks the clock nor changes runtime behavior; it
+does not claim the SDK ordering defect is fixed.

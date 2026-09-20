@@ -1,7 +1,6 @@
 """Offline workflow check: real graph/tools, scripted model, no Azure calls."""
 
 import asyncio
-from itertools import count
 import os
 from pathlib import Path
 import sys
@@ -311,29 +310,37 @@ class WorkflowTest(unittest.TestCase):
         self.assertNotIn("AZURE_CLIENT_SECRET", backend._env)
         self.assertTrue((backend.cwd / "skills/dataset-analysis/SKILL.md").is_file())
 
-    def test_persistent_checkpoint_reloads_pending_approval(self):
+    def test_agent_resumes_persisted_approval(self):
         from langchain_azure_ai.agents.hosting import FoundryCheckpointSaver
+
+        class PacedTestSaver(FoundryCheckpointSaver):
+            def __init__(self):
+                super().__init__()
+                self.write_lock = asyncio.Lock()
+
+            async def aput(self, *args, **kwargs):
+                # Test-only pacing avoids the SDK's same-second ordering defect.
+                # Exercise agent resume with real storage, without changing time.
+                async with self.write_lock:
+                    result = await super().aput(*args, **kwargs)
+                    await asyncio.sleep(1.1)
+                    return result
 
         async def check():
             (self.workspace / "persist.py").write_text("from pathlib import Path\nPath('resumed.txt').write_text('ok')\n")
             model = ScriptedModel(responses=[call("execute", {"command": f'"{sys.executable}" persist.py'})])
-            async with FoundryCheckpointSaver() as saver:
+            async with PacedTestSaver() as saver:
                 graph = build_agent(model, self.backend, saver, [web_search])
                 pending = await graph.ainvoke({"messages": [{"role": "user", "content": "Execute"}]}, self.config)
                 self.assertTrue(pending["__interrupt__"])
             self.assertFalse((self.workspace / "resumed.txt").exists())
-            async with FoundryCheckpointSaver() as saver:
+            async with PacedTestSaver() as saver:
                 graph = build_agent(ScriptedModel(responses=[AIMessage(content="Resumed")]), self.backend, saver, [web_search])
                 result = await graph.ainvoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config)
                 self.assertEqual(result["messages"][-1].content, "Resumed")
             self.assertEqual((self.workspace / "resumed.txt").read_text(), "ok")
 
-        # SDK local timestamps have one-second precision and tie-break by hashed
-        # item ID. Advance that clock so this test isolates durable resume.
-        with (
-            patch.dict(os.environ, {"FOUNDRY_HOSTING_ENVIRONMENT": "", "AGENTSERVER_STATE_ROOT": str(self.workspace / "state")}),
-            patch("azure.ai.agentserver.core.storage._local_state._now", side_effect=count(1_800_000_000)),
-        ):
+        with patch.dict(os.environ, {"FOUNDRY_HOSTING_ENVIRONMENT": "", "AGENTSERVER_STATE_ROOT": str(self.workspace / "state")}):
             asyncio.run(check())
 
 

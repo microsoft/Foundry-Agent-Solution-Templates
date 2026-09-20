@@ -46,6 +46,9 @@ workflow using Foundry managed web search, plus skill-guided dataset analysis.
   Do not bypass this with direct writes or imply it constrains approved shell code.
 - Keep session files separate from conversation checkpoints and long-term
   memory. Use the native Foundry checkpoint saver with user isolation.
+- Test agent behavior with scripted models and controlled storage. Keep the
+  persisted-approval test enabled; its test-only write pacing avoids a known
+  SDK timestamp collision. Do not apply that pacing to runtime code.
 - Preserve native summarization and output offloading. Use the native approval
   protocol and never silently bypass approvals.
 - Keep credentials, local Azure settings, resource identifiers and generated
