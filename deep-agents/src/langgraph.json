@@ -1,0 +1,5 @@
+{
+  "graphs": {
+    "agent": "main:create_graph"
+  }
+}

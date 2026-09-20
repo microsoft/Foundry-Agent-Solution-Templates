@@ -1,0 +1,4 @@
+deepagents==0.7.15
+langchain-azure-ai[hosting]==1.2.10
+azure-identity==1.25.3
+azure-ai-agentserver-responses==2.1.0
