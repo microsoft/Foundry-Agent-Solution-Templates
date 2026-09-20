@@ -15,7 +15,8 @@ workflow using Foundry managed web search, plus skill-guided dataset analysis.
 - `src/skills/` and `src/data/` — bundled analysis skill and synthetic inputs
 - `src/requirements.txt` — pinned direct dependencies
 - `tests/test_agent.py` — offline workflow, approvals, persistence and context checks
-- `docs/cost.md` — cost components and quota considerations
+- `docs/validation.md` — research, REST approval, continuity and offline validation
+- `docs/cost.md` — placeholder for deferred cost planning
 - `ATTRIBUTION.md` — upstream sources and license notices
 
 ## Preserve these invariants
@@ -45,8 +46,8 @@ workflow using Foundry managed web search, plus skill-guided dataset analysis.
   Do not bypass this with direct writes or imply it constrains approved shell code.
 - Keep session files separate from conversation checkpoints and long-term
   memory. Use the native Foundry checkpoint saver with user isolation.
-- Preserve native summarization and output offloading. Do not add a custom
-  approval server or silently bypass approvals to work around client limitations.
+- Preserve native summarization and output offloading. Use the native approval
+  protocol and never silently bypass approvals.
 - Keep credentials, local Azure settings, resource identifiers and generated
   output out of tracked files. Keep content recording disabled by default.
 - Let the hosting SDK configure telemetry; do not add a second global provider
@@ -66,7 +67,7 @@ python -m unittest discover -s tests -v
 For local development with a configured Foundry model, use
 `azd ai agent run deep-agents`. Deploy with `azd up`, or `azd deploy` for source
 updates; deploy/publish Toolbox changes first as described in the README.
-Follow the README's verification workflow. Distinguish offline
+Follow `docs/validation.md` for detailed verification. Distinguish offline
 test results from actual Azure deployment and model behavior.
 
 ## References
