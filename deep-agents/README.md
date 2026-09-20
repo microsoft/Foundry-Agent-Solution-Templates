@@ -129,8 +129,11 @@ azd up
 Select a supported subscription and region when prompted. `azure.yaml` pins
 the model name, version, SKU and capacity; change its deployment block before
 provisioning if your region or quota requires a different tool-capable model.
-The native provider supplies `FOUNDRY_PROJECT_ENDPOINT` and resolves the model
-deployment environment variable for the hosted service.
+The native provider supplies `FOUNDRY_PROJECT_ENDPOINT`. Both the declared model
+deployment name and the agent's `AZURE_AI_MODEL_DEPLOYMENT_NAME` default to
+`gpt-4.1-mini`, so a new environment needs no model-name setting. To use another
+deployment name, set `AZURE_AI_MODEL_DEPLOYMENT_NAME` in the azd environment;
+when provisioning a different model, also update the model/version/SKU fields.
 `TOOLBOX_NAME` selects the declared `deep-agents-tools` toolbox. For an existing
 deployment, run `azd deploy deep-agents-tools` before `azd deploy deep-agents`.
 Toolbox deployments create immutable versions. The adapter resolves the
