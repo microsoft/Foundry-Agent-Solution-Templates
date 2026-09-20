@@ -12,7 +12,8 @@ verification require an Azure subscription and can incur charges.
   model tokens; a research run makes multiple model calls.
 - Foundry/provider-created supporting storage, monitoring or build resources
   may also be billable. Inspect the resources actually provisioned.
-- Mock search has no external service or API-key cost.
+- Foundry Toolbox managed web search can incur usage charges. No Tavily key
+  is required; this does not make search free.
 
 Use Azure Cost Management to inspect actual charges. No fixed price estimate
 is promised. Run `azd down` after verification and confirm the environment's

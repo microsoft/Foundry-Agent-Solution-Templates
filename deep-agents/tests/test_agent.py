@@ -1,25 +1,33 @@
 """Offline workflow check: real graph/tools, scripted model, no Azure calls."""
 
-import json
 import asyncio
+from itertools import count
 import os
 from pathlib import Path
 import sys
 import tempfile
 import shutil
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.tools import tool
 from deepagents.backends import LocalShellBackend
 from deepagents.middleware.summarization import SummarizationMiddleware
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from agent import build_agent, mock_search
+from agent import build_agent
+
+
+@tool
+async def web_search(search_query: str) -> dict:
+    """Return synthetic search evidence for offline tests only."""
+    return {"results": [{"title": "Test source", "url": "https://example.com/research",
+                         "content": "Synthetic search result"}]}
 
 
 class ScriptedModel(FakeMessagesListChatModel):
@@ -31,8 +39,6 @@ class ScriptedModel(FakeMessagesListChatModel):
             if isinstance(message, ToolMessage):
                 if message.status == "error":
                     raise AssertionError(f"Tool failed: {message.name}")
-                if message.name == "mock_search":
-                    assert json.loads(message.content)["mock"] is True
         return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
 
@@ -63,13 +69,16 @@ class WorkflowTest(unittest.TestCase):
             patch.dict(os.environ, {
                 "FOUNDRY_PROJECT_ENDPOINT": "https://example.com/api/projects/test",
                 "AZURE_AI_MODEL_DEPLOYMENT_NAME": "test-model",
+                "TOOLBOX_NAME": "test-tools",
             }),
             patch("main.DefaultAzureCredential"),
+            patch("main.AzureAIProjectToolbox") as toolbox,
             patch("main.AzureAIOpenAIApiChatModel", return_value=model) as model_factory,
             patch("main.create_backend", return_value=self.backend),
             patch("main.FoundryCheckpointSaver", return_value=self.checkpointer) as saver,
             patch("langchain_azure_ai.agents.hosting.ResponsesHostServer") as server,
         ):
+            toolbox.return_value.get_tools = AsyncMock(return_value=[web_search])
             run.main(["--config", str(config), "--protocol", "responses",
                       "--host", "127.0.0.1", "--port", "8088"])
             graph = server.call_args.args[0]
@@ -78,45 +87,72 @@ class WorkflowTest(unittest.TestCase):
             self.assertEqual(model_factory.call_args.kwargs["model"], "test-model")
             server.return_value.run.assert_called_once_with(host="127.0.0.1", port=8088)
             saver.assert_called_once_with(user_isolation=True)
+            toolbox.return_value.get_tools.assert_awaited_once()
+            self.assertEqual(toolbox.call_args.kwargs["toolbox_name"], "test-tools")
 
-    def test_mock_research_workflow(self):
-        evidence = mock_search.invoke({"query": "Compare Cedar and Maple"})
-        self.assertEqual(evidence, mock_search.invoke({"query": "other query"}))
-        self.assertTrue(evidence["mock"])
-        with self.assertRaises(ValueError):
-            mock_search.invoke({"query": " "})
-        report = "MOCK / FICTIONAL TEST DATA: Cedar costs 12 credits. https://example.com/mock/cedar"
+    def test_research_workflow(self):
+        report = "Synthetic search result [Test source](https://example.com/research)"
         model = ScriptedModel(responses=[
             call("write_todos", {"todos": [{"content": "Research and report", "status": "in_progress"}]}),
-            call("write_file", {"file_path": "/research_request.md", "content": "Compare Cedar and Maple"}),
-            call("task", {"subagent_type": "research-agent", "description": "Compare Cedar and Maple"}),
-            call("mock_search", {"query": "Cedar and Maple"}),
-            AIMessage(content=json.dumps(evidence)),
+            call("write_file", {"file_path": "/research_request.md", "content": "Research a topic"}),
+            call("task", {"subagent_type": "research-agent", "description": "Research a topic"}),
+            call("web_search", {"search_query": "test topic"}),
+            AIMessage(content=report),
             call("write_file", {"file_path": "/final_report.md", "content": report}),
             call("read_file", {"file_path": "/final_report.md"}),
             call("write_todos", {"todos": [{"content": "Research and report", "status": "completed"}]}),
             AIMessage(content=report),
         ])
-        graph = build_agent(model, self.backend, self.checkpointer)
-        with patch.object(mock_search, "func", wraps=mock_search.func) as search:
-            state = graph.invoke({"messages": [{"role": "user", "content": "Compare Cedar and Maple"}]}, self.config)
-            search.assert_called_once_with(query="Cedar and Maple")
+        graph = build_agent(model, self.backend, self.checkpointer, [web_search])
+        with patch.object(web_search, "coroutine", wraps=web_search.coroutine) as search:
+            state = asyncio.run(graph.ainvoke({"messages": [{"role": "user", "content": "Research a topic"}]}, self.config))
+            search.assert_awaited_once_with(search_query="test topic")
         self.assertEqual(state["messages"][-1].content, report)
         self.assertEqual(state["todos"][0]["status"], "completed")
         self.assertEqual((self.workspace / "final_report.md").read_text(), report)
         results = [m for m in state["messages"] if isinstance(m, ToolMessage)]
-        self.assertTrue(any(m.name == "task" and "FICTIONAL" in str(m.content) for m in results))
+        self.assertTrue(any(m.name == "task" and "https://example.com/research" in str(m.content) for m in results))
         self.assertFalse(any(m.status == "error" for m in results))
         # Same session files survive a rebuilt graph, with isolated conversation state.
         model.responses = [call("read_file", {"file_path": "/final_report.md"}), AIMessage(content=report)]
         model.i = 0
-        rebuilt = build_agent(model, self.backend, self.checkpointer)
+        rebuilt = build_agent(model, self.backend, self.checkpointer, [web_search])
         continued = rebuilt.invoke({"messages": [{"role": "user", "content": "Read my report"}]}, self.config)
         self.assertGreater(len(continued["messages"]), len(state["messages"]))
         model.responses = [AIMessage(content="New conversation")]
         model.i = 0
         fresh = rebuilt.invoke({"messages": [{"role": "user", "content": "Hello"}]}, {"configurable": {"thread_id": "other-conversation"}})
         self.assertEqual(len(fresh["messages"]), 2)
+
+    def test_toolbox_selection_and_failures(self):
+        from main import create_graph
+
+        unrelated = web_search.model_copy(update={"name": "unrelated_tool"})
+        with (
+            patch.dict(os.environ, {
+                "FOUNDRY_PROJECT_ENDPOINT": "https://example.com/api/projects/test",
+                "AZURE_AI_MODEL_DEPLOYMENT_NAME": "test-model",
+                "TOOLBOX_NAME": "test-tools",
+            }),
+            patch("main.DefaultAzureCredential"),
+            patch("main.AzureAIProjectToolbox") as toolbox,
+            patch("main.AzureAIOpenAIApiChatModel"),
+            patch("main.create_backend", return_value=self.backend),
+            patch("main.FoundryCheckpointSaver", return_value=self.checkpointer),
+            patch("main.build_agent") as build,
+        ):
+            toolbox.return_value.get_tools = AsyncMock(return_value=[web_search, unrelated])
+            asyncio.run(create_graph())
+            self.assertEqual(build.call_args.args[3], [web_search])
+            build.reset_mock()
+            for tools in ([], [unrelated]):
+                toolbox.return_value.get_tools.return_value = tools
+                with self.assertRaisesRegex(ValueError, "must expose web_search"):
+                    asyncio.run(create_graph())
+            toolbox.return_value.get_tools.side_effect = RuntimeError("Toolbox unavailable")
+            with self.assertRaisesRegex(RuntimeError, "Toolbox unavailable"):
+                asyncio.run(create_graph())
+            build.assert_not_called()
 
     def test_shell_approval_and_rejection_including_subagents(self):
         for delegated in (False, True):
@@ -131,12 +167,12 @@ class WorkflowTest(unittest.TestCase):
                         responses = [call("task", {"subagent_type": "research-agent", "description": "Run approved check"})] + responses + [AIMessage(content="Complete")]
                     # Rejections intentionally produce an error ToolMessage.
                     model = ScriptedModel(responses=responses) if decision == "approve" else PermissiveModel(responses=responses)
-                    graph = build_agent(model, self.backend, InMemorySaver())
+                    graph = build_agent(model, self.backend, InMemorySaver(), [web_search])
                     pending = graph.invoke({"messages": [{"role": "user", "content": "Execute"}]}, self.config)
                     self.assertTrue(pending["__interrupt__"])
                     self.assertFalse(target.exists())
                     # Rebuild before resuming to verify the saved interrupt is sufficient.
-                    resumed = build_agent(model, self.backend, graph.checkpointer)
+                    resumed = build_agent(model, self.backend, graph.checkpointer, [web_search])
                     resumed.invoke(Command(resume={"decisions": [{"type": decision}]}), self.config)
                     self.assertEqual(target.exists(), decision == "approve")
 
@@ -155,7 +191,7 @@ class WorkflowTest(unittest.TestCase):
             call("execute", {"command": f'"{sys.executable}" analyze_sales.py'}),
             AIMessage(content="Done"),
         ])
-        graph = build_agent(model, self.backend, self.checkpointer)
+        graph = build_agent(model, self.backend, self.checkpointer, [web_search])
         pending = graph.invoke(
             {"messages": [{"role": "user", "content": "Analyze"}]}, self.config,
         )
@@ -173,7 +209,7 @@ class WorkflowTest(unittest.TestCase):
             call("execute", {"command": f'"{sys.executable}" large.py'}),
             AIMessage(content="Output saved"),
         ])
-        graph = build_agent(model, self.backend, self.checkpointer)
+        graph = build_agent(model, self.backend, self.checkpointer, [web_search])
         graph.invoke({"messages": [{"role": "user", "content": "Generate synthetic output"}]}, self.config)
         state = graph.invoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config)
         output = next(m for m in state["messages"] if isinstance(m, ToolMessage))
@@ -186,7 +222,7 @@ class WorkflowTest(unittest.TestCase):
         with patch("deepagents.graph.create_summarization_middleware", side_effect=lambda model, backend: SummarizationMiddleware(
             model=model, backend=backend, trigger=("messages", 4), keep=("messages", 2),
         )):
-            graph = build_agent(model, self.backend, self.checkpointer)
+            graph = build_agent(model, self.backend, self.checkpointer, [web_search])
         messages = [{"role": "user" if i % 2 == 0 else "assistant", "content": f"Fictional observation {i}"} for i in range(7)]
         graph.invoke({"messages": messages}, self.config)
         archives = list(self.workspace.glob("conversation_history/*.md"))
@@ -214,17 +250,22 @@ class WorkflowTest(unittest.TestCase):
             (self.workspace / "persist.py").write_text("from pathlib import Path\nPath('resumed.txt').write_text('ok')\n")
             model = ScriptedModel(responses=[call("execute", {"command": f'"{sys.executable}" persist.py'})])
             async with FoundryCheckpointSaver() as saver:
-                graph = build_agent(model, self.backend, saver)
+                graph = build_agent(model, self.backend, saver, [web_search])
                 pending = await graph.ainvoke({"messages": [{"role": "user", "content": "Execute"}]}, self.config)
                 self.assertTrue(pending["__interrupt__"])
             self.assertFalse((self.workspace / "resumed.txt").exists())
             async with FoundryCheckpointSaver() as saver:
-                graph = build_agent(ScriptedModel(responses=[AIMessage(content="Resumed")]), self.backend, saver)
+                graph = build_agent(ScriptedModel(responses=[AIMessage(content="Resumed")]), self.backend, saver, [web_search])
                 result = await graph.ainvoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config)
                 self.assertEqual(result["messages"][-1].content, "Resumed")
             self.assertEqual((self.workspace / "resumed.txt").read_text(), "ok")
 
-        with patch.dict(os.environ, {"FOUNDRY_HOSTING_ENVIRONMENT": "", "AGENTSERVER_STATE_ROOT": str(self.workspace / "state")}):
+        # SDK local timestamps have one-second precision and tie-break by hashed
+        # item ID. Advance that clock so this test isolates durable resume.
+        with (
+            patch.dict(os.environ, {"FOUNDRY_HOSTING_ENVIRONMENT": "", "AGENTSERVER_STATE_ROOT": str(self.workspace / "state")}),
+            patch("azure.ai.agentserver.core.storage._local_state._now", side_effect=count(1_800_000_000)),
+        ):
             asyncio.run(check())
 
 

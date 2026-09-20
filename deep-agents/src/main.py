@@ -8,6 +8,7 @@ import sys
 from azure.identity import DefaultAzureCredential
 from langchain_azure_ai.chat_models import AzureAIOpenAIApiChatModel
 from langchain_azure_ai.agents.hosting import FoundryCheckpointSaver
+from langchain_azure_ai.tools import AzureAIProjectToolbox
 from deepagents.backends import LocalShellBackend
 
 from agent import build_agent
@@ -38,12 +39,23 @@ def create_backend():
     return LocalShellBackend(root_dir=workspace, env=env, inherit_env=False)
 
 
-def create_graph():
+async def create_graph():
+    credential = DefaultAzureCredential()
+    toolbox = AzureAIProjectToolbox(
+        project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
+        toolbox_name=os.environ["TOOLBOX_NAME"],
+        credential=credential,
+    )
+    search_tools = [tool for tool in await toolbox.get_tools() if tool.name == "web_search"]
+    if not search_tools:
+        raise ValueError("The configured Foundry Toolbox must expose web_search.")
     model = AzureAIOpenAIApiChatModel(
         project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-        credential=DefaultAzureCredential(),
+        credential=credential,
         model=os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
         use_responses_api=True,
         store=False,
     )
-    return build_agent(model, create_backend(), FoundryCheckpointSaver(user_isolation=True))
+    return build_agent(
+        model, create_backend(), FoundryCheckpointSaver(user_isolation=True), search_tools,
+    )

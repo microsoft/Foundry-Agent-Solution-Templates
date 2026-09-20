@@ -3,10 +3,10 @@
 A research assistant adapted from the upstream Deep Research example. Deep
 Agents plans, delegates to a research subagent, uses tools and working files, and returns a
 cited report. The model runs in Foundry; `langchain-azure-ai` supplies the model
-wrapper and Responses host. Search uses bundled, clearly labeled fictional
-evidence. A bundled skill also analyzes a fictional sales dataset with Python,
-pausing for approval before shell execution. No Tavily key or other search
-subscription is required.
+wrapper and Responses host. Research uses Foundry Toolbox managed `web_search`.
+A bundled skill also analyzes a fictional sales dataset with Python, pausing
+for approval before shell execution. No Tavily key is required; Foundry web
+search usage can incur charges.
 
 The SDK's [configuration-driven runner](https://docs.langchain.com/oss/python/integrations/providers/microsoft#use-the-configuration-driven-runner)
 loads `create_graph` from `src/main.py` through `src/langgraph.json`. Agent code
@@ -18,17 +18,16 @@ Responses server without a custom server entry point.
 - Learn how to host a LangChain/LangGraph Deep Agents workflow on Foundry.
 - Deploy a research agent with planning, subagent delegation, tool calls and
   report generation using a Foundry model.
-- Explore the workflow with bundled fictional evidence and no external search
-  API key.
+- Research public sources with Foundry managed web search and source citations.
 - Load local skills, run approved Python analysis and continue a conversation
   using Foundry checkpoints and a Hosted Agent session workspace.
 - Use the template as a starting point for your own research tools and prompts.
 
 ## What this template is not for
 
-This template is not a live web research service or a complete production
-architecture. The fixture products, prices and URLs are fictional. It does not
-provide live evidence, long-term memory or a shell security sandbox.
+This template is not a complete production architecture or a guarantee that
+every research claim is correct. The bundled sales dataset is fictional. It
+does not provide long-term memory or a shell security sandbox.
 
 Review [Cost planning](docs/cost.md) before provisioning.
 
@@ -39,19 +38,21 @@ flowchart LR
     Client[Foundry portal or azd invoke] --> Host[SDK Responses host]
     Host --> Planner[Deep Agents planner]
     Planner --> Researcher[Research subagent]
-    Researcher --> Mock[Bundled mock evidence]
+    Researcher --> Toolbox[Foundry Toolbox web_search]
     Planner --> Files[Session workspace and local skills]
     Planner --> Approval[Human approval]
     Approval --> Shell[Local shell in hosted container]
     Host --> State[Foundry conversation checkpoints]
     Planner --> Model[Foundry model deployment]
     Researcher --> Model
-    Planner --> Report[Inline report with mock citations]
+    Planner --> Report[Inline report with source citations]
 ```
 
 The native `microsoft.foundry` azd provider provisions the Foundry resources
 required for a project, the declared `gpt-4.1-mini` model deployment and the
-Hosted Agent. You supply an Azure subscription, a supported region with model
+Hosted Agent. The native Toolbox service deploys `deep-agents-tools`, containing
+only managed `web_search`; the SDK loads that tool for the research subagent.
+You supply an Azure subscription, a supported region with model
 quota, and an identity allowed to provision resources and role assignments.
 The hosted runtime uses managed identity; local model calls use
 `DefaultAzureCredential`. No API keys belong in source control.
@@ -83,7 +84,8 @@ Run every command from the `deep-agents` directory.
 
 - Azure CLI
 - Azure Developer CLI (`azd`) 1.32 or newer
-- The `azure.ai.agents` extension beta.9 or newer and the native
+- The `azure.ai.agents` extension beta.9 or newer, `azure.ai.toolboxes` beta.5
+  or newer, and the native
   `microsoft.foundry` infrastructure provider
 - Python 3.13 with pip for local development and tests
 - An Azure subscription, a supported region with model quota, and permission
@@ -95,6 +97,7 @@ Sign in and install the required extensions:
 az login
 azd auth login
 azd extension install azure.ai.agents
+azd extension install azure.ai.toolboxes
 azd extension install microsoft.foundry
 ```
 
@@ -110,11 +113,18 @@ the model name, version, SKU and capacity; change its deployment block before
 provisioning if your region or quota requires a different tool-capable model.
 The native provider supplies `FOUNDRY_PROJECT_ENDPOINT` and resolves the model
 deployment environment variable for the hosted service.
+`TOOLBOX_NAME` selects the declared `deep-agents-tools` toolbox. For an existing
+deployment, run `azd deploy deep-agents-tools` before `azd deploy deep-agents`.
+Toolbox deployments create immutable versions. The adapter resolves the
+toolbox's published default; after changing its definition, inspect
+`azd ai toolbox versions list deep-agents-tools` and publish the intended version
+with `azd ai toolbox publish deep-agents-tools <version>`, then redeploy the
+agent to reload its tools.
 
 ### 3. Test the agent
 
 ```powershell
-azd ai agent invoke deep-agents --new-session --new-conversation --protocol responses "Compare the fictional Cedar and Maple document processing services using the bundled mock evidence. Plan the work, delegate research, save and read the final report, and return the report inline."
+azd ai agent invoke deep-agents --new-session --new-conversation --protocol responses "Research how Microsoft Foundry hosted agents handle session storage. Use official documentation, plan the work, delegate research, save and read the final report, and return the report inline with source URLs."
 ```
 
 The same prompt can be used in the deployed agent's Foundry playground.
@@ -123,13 +133,11 @@ new session and conversation; existing sessions remain bound to their version.
 Verify the following:
 
 - The run completes through the Responses endpoint. Tool activity shows
-  `write_todos`, `task`, `mock_search`, `write_file` and `read_file`.
-- The inline report is labeled MOCK / FICTIONAL TEST DATA, compares Cedar and
-  Maple, and cites only the bundled `https://example.com/mock/` identifiers.
-- The reported fixture facts are accurate: 12 vs 18 credits per 1,000 pages,
-  80 vs 120 pages/minute and 7 vs 1 days retention.
-- A request about an unsupported real-world topic reports the evidence gap,
-  without pretending to search the web or presenting fixtures as real facts.
+  `write_todos`, `task`, `web_search`, `write_file` and `read_file`.
+- `web_search` returns real sources through Foundry Toolbox; inspect the tool
+  output and open the cited URLs to check the report's claims.
+- The inline report cites returned source URLs and states evidence gaps or
+  search failures. It does not substitute fictional sales data for web evidence.
 
 Agent behavior is model-driven; inspect tool activity as well as final prose.
 Offline tests do not verify Azure connectivity or model-generated results.
@@ -213,14 +221,21 @@ py -3.13 -m venv .venv
 ```
 
 On Linux/macOS use `python3.13` and `.venv/bin/python`. This check drives the
-real graph with a scripted model through planning, delegation, mock tool use,
+real graph with a scripted model and an async test-only search stub through
+planning, delegation, cited tool results,
 file writing/reading, report completion, approved/rejected execution (including
 subagents), saved-approval reload with the SDK's local persistent state store,
 conversation isolation, output offloading and history summarization. It makes
-no Azure calls and does not verify cloud restart recovery.
+no Azure calls and does not verify cloud restart recovery or live search quality.
+It also checks SDK runner loading, Toolbox tool selection and startup failures.
+The persistence test advances the SDK local store's clock deterministically:
+its second-resolution timestamps otherwise order simultaneous writes by ID.
+That test does not verify latest-checkpoint ordering in the real service.
 
 After `az login`, set `FOUNDRY_PROJECT_ENDPOINT` and
-`AZURE_AI_MODEL_DEPLOYMENT_NAME` in your shell to your own project's values.
+`AZURE_AI_MODEL_DEPLOYMENT_NAME` in your shell to your own project's values,
+and `TOOLBOX_NAME` to `deep-agents-tools` (or your existing toolbox exposing
+`web_search`). Deploy the toolbox before starting the local agent.
 Set local content-recording controls and keep SDK state inside the ignored
 template directory before starting either local host:
 
@@ -245,10 +260,10 @@ The graph factory reads shell variables; it does not load a `.env` file. In
 another terminal you can invoke either host:
 
 ```powershell
-azd ai agent invoke deep-agents --local --protocol responses "Compare Cedar and Maple using the mock evidence. Return the full report inline."
+azd ai agent invoke deep-agents --local --protocol responses "Research Microsoft Foundry hosted agent session storage using official documentation. Return the full report inline with source URLs."
 ```
 
-Local model calls are billable. Do not expose the local development host to
+Local model and web search calls are billable. Do not expose the local development host to
 untrusted networks. The hosting SDK automatically initializes OpenTelemetry
 and uses the runtime's telemetry configuration; Foundry also emits service-side
 invocation traces. No custom exporter is configured by this template. See
@@ -259,11 +274,10 @@ override service retention policies.
 
 ## Customize
 
-- Change `src/mock_evidence.json` to explore other fictional comparisons.
-  Update the coordinator and researcher instructions in `src/agent.py` to
-  describe the new evidence scope.
-- Replace `mock_search` in `src/agent.py` with your own research tool and update
-  the prompts, tests and mock labels to match its behavior.
+- Customize the coordinator and researcher instructions in `src/agent.py`.
+- Change the declared Toolbox in `azure.yaml` to configure managed search.
+  The graph deliberately selects only `web_search`; adding other tools to the
+  Toolbox does not automatically expose them to the agent.
 - Configure the model deployment in `azure.yaml` before provisioning.
 - Add skill directories under `src/skills` and synthetic inputs under `src/data`.
   Existing session copies are preserved; use a new session to pick up changed
@@ -275,6 +289,11 @@ override service retention policies.
   and its Foundry project/model access. Do not add keys to fix a role issue.
 - Model deployment failures: check the region, model version, SKU and quota
   in `azure.yaml`; retry with a supported deployment configuration.
+- Toolbox startup failures: verify `TOOLBOX_NAME`, the published version,
+  `web_search` availability and the caller's Toolbox access. The graph fails
+  startup if search is missing; it never silently falls back to fictional data.
+- Search failures: inspect Toolbox tool output and region/service availability.
+  A completed response alone does not prove that a search succeeded.
 - Missing extensions: update azd and install the required extensions.
 - Incomplete workflow: inspect `azd ai agent monitor` output and the tool
   activity; keep logs local and redact identities and resource IDs before sharing.
