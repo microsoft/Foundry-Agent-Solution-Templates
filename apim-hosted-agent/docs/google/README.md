@@ -1,131 +1,57 @@
-# Configure the optional Google MCP gateway
+# Configure Google MCP in Azure APIM and Foundry
 
-Google MCP is disabled by default. This guide enables a separately deployed
-Streamable HTTP MCP server on Google Cloud Run, protects it with Google OAuth,
-routes it through API Management (APIM), and exposes it to the Foundry hosted
-agent through a Toolbox connection.
+[简体中文](zh-cn/README.md) | [Configure Google OAuth](google-oauth.md)
 
-Use this page as the end-to-end procedure. The
-[Google Cloud preparation guide](google-cloud/README.md) contains the detailed
-Google console and Cloud Run steps.
+This guide connects an existing Google OAuth-protected Streamable HTTP MCP
+server to the APIM-hosted Foundry agent. Google MCP is disabled by default.
 
-## Workflow at a glance
+This repository does not deploy the Cloud Run server. Follow Google's official
+guides:
 
-| Stage | Action | Checkpoint |
-| --- | --- | --- |
-| 1 | Create a Google OAuth Web client with a temporary redirect URI | Client ID and secret are stored securely |
-| 2 | Deploy the OAuth-protected Cloud Run MCP server | Full HTTPS `/mcp` endpoint returns 401 without a token |
-| 3 | Configure the azd environment and Google Toolbox entry | All required Google values are present |
-| 4 | Run `azd provision` | Azure resources exist and the final callback is exported |
-| 5 | Add the final callback to Google | Exact `GOOGLE_OAUTH_REDIRECT_URL` is saved |
-| 6 | Run `azd deploy` | Hosted agent reports `active` |
-| 7 | Test hosted-agent OAuth and tools | Latest consent URL is authorized; a safe advertised tool can run |
-| 8 | Optionally test the Toolbox directly | Developer identity is authorized separately |
+- [Host MCP servers on Cloud Run](https://docs.cloud.google.com/run/docs/host-mcp-servers)
+- [Build and deploy a Python service to Cloud Run](https://docs.cloud.google.com/run/docs/quickstarts/build-and-deploy/deploy-python-service)
 
-## Values worksheet
+## Before you begin
 
-Record these values as you complete the workflow. Never put secrets in source
-control, documentation, screenshots, logs, or tickets.
+Prepare:
 
-| Value | Source | Available after |
-| --- | --- | --- |
-| `<GOOGLE_CLOUD_PROJECT_ID>` | Your Google Cloud project | Before starting |
-| `<GOOGLE_OAUTH_CLIENT_ID>` | Google OAuth Web client | Step 1 |
-| `<GOOGLE_OAUTH_CLIENT_SECRET>` | Google OAuth Web client | Step 1 |
-| `<MCP_ENDPOINT>` | Cloud Run service URL plus `/mcp` | Step 2 |
-| `<AZD_ENVIRONMENT_NAME>` | Your azd environment | Step 3 |
-| `GOOGLE_OAUTH_REDIRECT_URL` | `azd env get-value` | Step 4 |
-| `APIM_NAME` | azd environment | Step 4 |
-| Agent gateway | `https://<APIM_NAME>.azure-api.net/agent/responses` | Step 6 |
+- `GOOGLE_OAUTH_CLIENT_ID`;
+- `GOOGLE_OAUTH_CLIENT_SECRET`;
+- a public HTTPS MCP endpoint ending in `/mcp`.
 
-## 1. Check prerequisites
+Create the Web client with a temporary redirect URI by following
+[Configure Google OAuth](google-oauth.md). Configure the external server to
+validate tokens for the same client ID. An unauthenticated MCP request should
+reach the application and return `401`.
 
 Complete the main template [prerequisites](../../README.md#1-prerequisites).
-You also need:
+Terraform users must activate `azure-terraform.yaml` as described in the main
+README and use a separate azd environment from Bicep.
 
-- a Google Cloud project with billing enabled;
-- permission to configure Google Auth Platform and deploy Cloud Run;
-- MCP server source code, or an existing compatible Cloud Run MCP server;
-- an allowed Google account when the OAuth application is External and in
-  Testing status.
+## 1. Configure azd and the Toolbox
 
-The MCP server defines its own tool inventory. This template does not assume
-any tool name. Tool names and input schemas must be discovered at runtime.
-
-## 2. Prepare Google OAuth and Cloud Run
-
-Follow the [Google Cloud preparation guide](google-cloud/README.md). The setup
-is intentionally two-stage:
-
-1. Create the OAuth Web client with a temporary redirect URI.
-2. Deploy Cloud Run with
-   `ALLOWED_CLIENT_IDS=<GOOGLE_OAUTH_CLIENT_ID>`.
-3. Return here with the client ID, client secret, and full `/mcp` endpoint.
-4. Add the Foundry-generated final redirect URI after Azure provisioning.
-
-Before continuing, verify that an unauthenticated MCP request reaches the
-application and returns `401`, not a Cloud Run infrastructure `403`.
-
-## 3. Select the infrastructure manifest
-
-Run every command from `apim-hosted-agent`.
-
-- **Bicep:** keep the committed `azure.yaml` active.
-- **Terraform:** activate `azure-terraform.yaml` before running azd:
-
-  ```powershell
-  Rename-Item azure.yaml azure-bicep.yaml
-  Rename-Item azure-terraform.yaml azure.yaml
-  ```
-
-  Run all Terraform azd commands while the Terraform manifest is named
-  `azure.yaml`. Restore the filenames when the operation is finished:
-
-  ```powershell
-  Rename-Item azure.yaml azure-terraform.yaml
-  Rename-Item azure-bicep.yaml azure.yaml
-  ```
-
-Use separate azd environments for Bicep and Terraform so their state never
-overlaps.
-
-## 4. Configure the azd environment
-
-Create or select an environment as described by the main README. Set the
-Google endpoint and enable flag:
+Run from `apim-hosted-agent`:
 
 ```powershell
 azd env set GOOGLE_MCP_ENABLED 'true'
 azd env set GOOGLE_MCP_ENDPOINT 'https://<cloud-run-service-host>/mcp'
+azd env set GOOGLE_OAUTH_CLIENT_ID '<google-web-oauth-client-id>'
+azd env set GOOGLE_OAUTH_CLIENT_SECRET '<google-web-oauth-client-secret>'
 ```
 
-Enter the OAuth values without placing the secret in shell history:
+Keep the secret outside source control and protect the local `.azure/`
+directory.
 
-```powershell
-$googleClientId = Read-Host 'Google OAuth client ID'
-$secureSecret = Read-Host 'Google OAuth client secret' -AsSecureString
-$plainSecret = [System.Net.NetworkCredential]::new('', $secureSecret).Password
-
-azd env set GOOGLE_OAUTH_CLIENT_ID $googleClientId
-azd env set GOOGLE_OAUTH_CLIENT_SECRET $plainSecret
-
-$plainSecret = $null
-$secureSecret.Dispose()
-```
-
-The secret is stored in the local azd environment under `.azure/`. Protect
-that directory and remove the environment when it is no longer needed.
-
-Optional APIM denylists accept comma-separated, case-insensitive exact values:
+Optional exact-match denylists:
 
 ```powershell
 azd env set GOOGLE_BLOCKED_EMAILS 'blocked-user@example.com'
 azd env set GOOGLE_BLOCKED_TOOL_NAMES '<tool-name-1>,<tool-name-2>'
 ```
 
-Only configure tool names returned by the live MCP server's `tools/list`.
+Only use tool names returned by the live server's `tools/list`.
 
-Add Google to `services.tools.tools` in the currently active `azure.yaml`:
+Add Google to `services.tools.tools` in the active `azure.yaml`:
 
 ```yaml
 - connection: google
@@ -135,21 +61,10 @@ Add Google to `services.tools.tools` in the currently active `azure.yaml`:
   type: mcp
 ```
 
-The committed manifests intentionally omit this entry. With incomplete Google
-values, the IaC templates do not create the Google connection, and a Toolbox
-entry that references `google` cannot deploy.
+The committed manifests intentionally omit this entry. All Google values must
+be present before it can deploy.
 
-### Configuration checkpoint
-
-- `GOOGLE_MCP_ENABLED` is `true`.
-- `GOOGLE_MCP_ENDPOINT` is the complete HTTPS `/mcp` URL.
-- Google client ID and secret are present in the selected azd environment.
-- The active manifest contains Google and uses the intended IaC provider.
-- `ALLOWED_CLIENT_IDS` on Cloud Run contains the same client ID.
-
-## 5. Provision Azure and retrieve the final callback
-
-Provision infrastructure without deploying the Toolbox or agent:
+## 2. Provision and register the callback
 
 ```powershell
 azd provision --no-prompt
@@ -157,181 +72,82 @@ $googleRedirectUrl = (azd env get-value GOOGLE_OAUTH_REDIRECT_URL).Trim()
 $googleRedirectUrl
 ```
 
-Provisioning creates the following only while Google MCP is enabled:
+Provisioning creates the Google APIM API/backend and Foundry OAuth connection.
+The redirect URL must be a non-empty HTTPS URL.
 
-- APIM backend `google-mcp`;
-- APIM MCP API `tool-<foundry-project>-google-mcp` and its policy;
-- Google governance named values;
-- Foundry custom OAuth connection `google`.
+Open the same Google Web client and follow
+[OAuth stage B](google-oauth.md#stage-b-add-the-foundry-callback). Add
+`$googleRedirectUrl` exactly as emitted.
 
-### Provisioning checkpoint
+![Foundry redirect URL registered in Google](images/google-oauth-foundry-redirect-uri.png)
 
-- `GOOGLE_OAUTH_REDIRECT_URL` is a non-empty HTTPS URL.
-- The Google Foundry connection exists.
-- The Google APIM API and backend exist.
-- GitHub resources are present or absent according to the selected scenario.
-
-## 6. Register the final callback and deploy
-
-In **Google Auth Platform > Clients**, open the Web client created in step 2.
-Add `$googleRedirectUrl` under **Authorized redirect URIs** exactly as emitted.
-Keep the temporary URI until end-to-end validation succeeds, then remove it.
-
-Google requires an exact match, including scheme, host, path, case, and trailing
-slash.
-
-![Foundry redirect URL registered as an authorized Google OAuth redirect URI](images/google-mcp-foundry-redirect.png)
-
-After saving the callback, deploy:
+## 3. Deploy
 
 ```powershell
 azd deploy --no-prompt
 azd ai agent show --output json
 ```
 
-The deployed agent is ready when its version reports `active` or `deployed`.
-Its governed endpoint is:
+Continue when the agent version is `active` or `deployed`. The governed
+endpoint is:
 
 ```text
 https://<APIM_NAME>.azure-api.net/agent/responses
 ```
 
-## 7. Test hosted-agent consent and tool use
+## 4. Call the agent API
 
-Hosted-agent requests in this guide are stateless. Every request uses
-`store=false`. Every retry creates a new response and, when consent is needed,
-a new short-lived, single-use consent URL. Never reuse an older URL.
+Send one simple stateless request. The agent response will contain either a
+normal message or an OAuth consent request.
 
 ```powershell
+$token = (az account get-access-token `
+  --resource https://ai.azure.com/ `
+  --query accessToken `
+  --output tsv).Trim()
 $apimName = (azd env get-value APIM_NAME).Trim()
-$agentGateway = "https://$apimName.azure-api.net/agent/responses"
-$inputText = @'
-Use the Google MCP connection. Discover its currently advertised tools dynamically,
-then choose a non-destructive tool whose result contains no personal data.
-Do not assume any tool name.
-'@
+$gateway = "https://$apimName.azure-api.net/agent/responses"
 
-function Invoke-GoogleAgentRequest {
-  $token = (az account get-access-token `
-    --resource https://ai.azure.com/ `
-    --query accessToken `
-    --output tsv).Trim()
+$body = @{
+  input = 'Use Google MCP and return a short non-personal result.'
+  store = $false
+} | ConvertTo-Json -Compress
 
-  $body = @{
-    input = $inputText
-    store = $false
-  } | ConvertTo-Json -Compress
+$json = $body | curl.exe --silent --show-error --fail-with-body `
+  --request POST $gateway `
+  --header "Authorization: Bearer $token" `
+  --header 'Content-Type: application/json' `
+  --data-binary '@-'
 
-  $json = $body | curl.exe `
-    --silent `
-    --show-error `
-    --fail-with-body `
-    --request POST $agentGateway `
-    --header "Authorization: Bearer $token" `
-    --header 'Content-Type: application/json' `
-    --data-binary '@-'
-
-  if ($LASTEXITCODE -ne 0) {
-    throw "Hosted-agent request failed with curl exit code $LASTEXITCODE."
-  }
-
-  ($json -join "`n") | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) {
+  throw "Request failed with curl exit code $LASTEXITCODE."
 }
 
-$response = Invoke-GoogleAgentRequest
-$consentRequests = @(
-  $response.output |
-    Where-Object { $_.type -eq 'oauth_consent_request' }
-)
-$consentUrl = $null
-
-if ($consentRequests.Count -gt 0) {
-  if ($consentRequests.Count -ne 1 -or
-      [string]::IsNullOrWhiteSpace([string]$consentRequests[0].consent_link)) {
-    throw 'The response did not contain exactly one usable OAuth consent link.'
-  }
-
-  $consentUrl = [string]$consentRequests[0].consent_link
-  $consentUrl
-} else {
-  $response.status
-  @($response.output | ForEach-Object { $_.type })
-}
+$response = ($json -join "`n") | ConvertFrom-Json
+$response.status
+$response.output | ConvertTo-Json -Depth 10
 ```
 
-When `$consentUrl` is returned:
+Interpret `response.output`:
 
-1. Open it immediately.
-2. Sign in as an allowed/test user.
-3. Check **I have verified this request and trust the source**.
-4. Choose **Allow access**.
-5. Wait for **Authentication successful**.
-6. Run the request block again as a new independent request.
+- `message`: the agent returned a normal response.
+- `oauth_consent_request`: open its `consent_link`, wait for
+  **Authentication successful**, then rerun the same request.
+- `mcp_approval_request`: OAuth succeeded, but the tool still requires approval.
 
-If consent is requested again, use only the new `consent_link` from that
-response. Stateless requests do not use `previous_response_id`.
+Each request uses `store=false` and is independent. If consent is requested
+again, use only the newest link. Never reuse an older URL or use
+`previous_response_id`.
 
-Because the Toolbox entry uses `require_approval: always`, a request after
-OAuth can return `mcp_approval_request`. OAuth and tool approval are separate
-steps. Complete approval with a client that supports the Foundry Responses MCP
-approval flow before expecting final tool output.
+## Common issues
 
-### Hosted-agent success criteria
-
-- APIM returns HTTP 200.
-- The agent no longer returns `oauth_consent_request` for the authorized caller.
-- A tool is selected from the runtime-advertised inventory.
-- The chosen tool is non-destructive and produces no personal output.
-- The response contains the expected tool result or a clearly identified
-  approval request.
-
-## 8. Optionally test the Toolbox directly
-
-Direct Toolbox calls use the developer identity. Hosted-agent calls use the
-hosted caller context. Foundry can require separate OAuth consent for each
-identity:
-
-- Hosted-agent consent does not authorize a direct Toolbox client.
-- Direct Toolbox consent does not authorize the hosted-agent caller.
-
-Use an MCP-capable client to call `tools/list` only after completing the
-developer-identity consent flow. Select a tool from the returned inventory and
-schema; never assume a name or arguments. Do not invoke or log identity-bearing
-tool output.
-
-## 9. Troubleshoot
-
-See [Google Cloud troubleshooting](google-cloud/troubleshooting.md) for callback,
-scope, audience, consent-state, approval, and Cloud Run errors.
-
-Quick checks:
-
-- `redirect_uri_mismatch`: compare Google configuration with
-  `GOOGLE_OAUTH_REDIRECT_URL` exactly.
-- `401` from MCP: verify the bearer token, expiry, and
-  `ALLOWED_CLIENT_IDS`.
-- `403` before the MCP application responds: verify Cloud Run permits
-  unauthenticated infrastructure invocation.
-- `404` or `Code ... not found`: discard the old single-use URL and generate a
-  new stateless request.
-- repeated consent: confirm whether the caller is the hosted agent or a direct
-  Toolbox developer identity.
-
-## 10. Disable or clean up
-
-Choose the action that matches your goal:
-
-| Goal | Action |
+| Symptom | Resolution |
 | --- | --- |
-| Hide Google from the agent but retain Azure resources | Remove the Google Toolbox entry and run `azd deploy tools --no-prompt` |
-| Delete the Azure environment | Run `azd down --force --purge --no-prompt` |
-| Remove local azd credentials after Azure cleanup | Run `azd env remove <AZD_ENVIRONMENT_NAME> --force` |
-| Delete Cloud Run | Follow the Google Cloud cleanup guide |
-| Retire Google OAuth | Remove callbacks/test users, then disable or delete the client and secret |
+| `redirect_uri_mismatch` | Compare Google configuration with `GOOGLE_OAUTH_REDIRECT_URL` exactly |
+| Consent URL returns 404 or `Code ... not found` | Generate a new stateless request and use its newest URL |
+| Consent repeats after browser success | Confirm the environment and caller identity; hosted and direct Toolbox consent are separate |
+| MCP returns `401` after OAuth | Verify the external server validates the same client ID |
+| `mcp_approval_request` | Continue with a client that supports Foundry MCP approval |
 
-Setting `GOOGLE_MCP_ENABLED=false` and provisioning again invokes the selected
-provider's native lifecycle: Bicep can retain earlier resources, while
-Terraform can destroy resources removed from its configuration.
-
-`azd down` and `azd env remove` do not delete the external Cloud Run service or
-Google OAuth application.
+See [Google OAuth troubleshooting](google-oauth.md#common-oauth-issues) for
+Google application, scope, callback, and test-user errors.
