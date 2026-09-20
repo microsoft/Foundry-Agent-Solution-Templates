@@ -13,6 +13,17 @@ loads `create_graph` from `src/main.py` through `src/langgraph.json`. Agent code
 only constructs the graph; local and hosted startup commands select the
 Responses server without a custom server entry point.
 
+Researchers call `think_tool` after each search to summarize evidence, gaps and
+whether to narrow the next query or stop. The tool records a concise progress
+assessment; it does not search, validate sources or call a separate model.
+Simple questions have a prompt budget of 2-3 searches per researcher, complex
+questions up to 5, with earlier stopping when evidence is sufficient or two
+successive searches add no new information. The coordinator defaults to one
+researcher, permits up to three in parallel for independent aspects, and uses
+at most three delegation rounds. These are model instructions, not code-enforced
+quotas. The final report consolidates numbered citations and checks coverage
+against the saved request.
+
 ## What this template is for
 
 - Learn how to host a LangChain/LangGraph Deep Agents workflow on Foundry.
@@ -142,6 +153,20 @@ Verify the following:
 Agent behavior is model-driven; inspect tool activity as well as final prose.
 Offline tests do not verify Azure connectivity or model-generated results.
 After source changes, use `azd deploy` and repeat the same verification prompt.
+
+To check research strategy, start a fresh session and conversation for each
+case. Inspect subagent tool activity as well as the final report:
+
+| Case | Example prompt | Expected behavior |
+|---|---|---|
+| Simple fact | What happens to a Foundry hosted agent's HOME files when its session stops? Use official documentation. | Search, assess with `think_tool`, and stop once evidence answers the question; no need to exhaust the budget. |
+| Multiple aspects | Compare hosted session files, conversation checkpoints and long-term memory in Foundry, including lifetime and scope. | Delegate independent aspects, narrow searches for missing evidence and consolidate citations across researchers. |
+| Evidence gap | Find an official guarantee that every arbitrary shell side effect executes exactly once after a hosted-agent crash. If unavailable, report that gap. | Assess insufficient/repeated evidence, stop at the prompt budget and explicitly report what could not be verified. |
+
+Compare the same prompts on the preceding agent version using `--version` and
+new sessions. Check search/assessment order, citation support, repeated queries
+and disclosed gaps; do not treat fewer calls alone as higher quality. Scripted
+tests verify tool wiring, not whether a live model always follows these rules.
 
 ### 4. Verify analysis, approval and continuity
 

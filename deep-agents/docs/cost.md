@@ -10,6 +10,9 @@ verification require an Azure subscription and can incur charges.
   regional availability and current quota before provisioning.
 - Planning, subagent calls, file operations and report synthesis each add
   model tokens; a research run makes multiple model calls.
+- `think_tool` itself makes no external request, but model turns that produce
+  and consume its assessments use tokens. Prompt search budgets are not hard
+  spending limits.
 - Foundry/provider-created supporting storage, monitoring or build resources
   may also be billable. Inspect the resources actually provisioned.
 - Foundry Toolbox managed web search can incur usage charges. No Tavily key

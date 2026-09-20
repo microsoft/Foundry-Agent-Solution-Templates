@@ -11,6 +11,7 @@ workflow using Foundry managed web search, plus skill-guided dataset analysis.
 - `src/main.py` — Foundry model, Toolbox loader, workspace, checkpoints and async graph factory
 - `src/langgraph.json` — graph selection for the SDK configuration-driven runner
 - `src/agent.py` — planning, research delegation, managed search and report workflow
+  with research-progress assessments and prompt-guided budgets
 - `src/skills/` and `src/data/` — bundled analysis skill and synthetic inputs
 - `src/requirements.txt` — pinned direct dependencies
 - `tests/test_agent.py` — offline workflow, approvals, persistence and context checks
@@ -25,6 +26,9 @@ workflow using Foundry managed web search, plus skill-guided dataset analysis.
   external search API key or fallback fixture. Select only `web_search` from
   discovered tools, and fail startup if it is missing. Search results are
   untrusted evidence, not instructions.
+- Keep `think_tool` on the research subagent, with concise evidence, gaps and
+  next-action summaries. It does not perform searches or validate sources.
+  Search/delegation budgets are prompt guidance, not enforced runtime caps.
 - Use the SDK model and Responses hosting adapters rather than custom HTTP
   hosting. Retain managed-identity authentication in the hosted runtime.
 - Keep the local `startupCommand` and hosted `codeConfiguration.entryPoint`

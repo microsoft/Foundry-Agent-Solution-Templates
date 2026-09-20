@@ -20,7 +20,7 @@ from deepagents.middleware.summarization import SummarizationMiddleware
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from agent import build_agent
+from agent import build_agent, think_tool
 
 
 @tool
@@ -91,22 +91,43 @@ class WorkflowTest(unittest.TestCase):
             self.assertEqual(toolbox.call_args.kwargs["toolbox_name"], "test-tools")
 
     def test_research_workflow(self):
-        report = "Synthetic search result [Test source](https://example.com/research)"
+        report = "Synthetic search result [1].\n\nSources\n[1] Test source: https://example.com/research"
+        assessment = "The returned source covers the question; no gaps remain. Stop searching."
         model = ScriptedModel(responses=[
             call("write_todos", {"todos": [{"content": "Research and report", "status": "in_progress"}]}),
             call("write_file", {"file_path": "/research_request.md", "content": "Research a topic"}),
             call("task", {"subagent_type": "research-agent", "description": "Research a topic"}),
             call("web_search", {"search_query": "test topic"}),
+            call("think_tool", {"summary": assessment}),
             AIMessage(content=report),
             call("write_file", {"file_path": "/final_report.md", "content": report}),
             call("read_file", {"file_path": "/final_report.md"}),
+            call("read_file", {"file_path": "/research_request.md"}),
             call("write_todos", {"todos": [{"content": "Research and report", "status": "completed"}]}),
             AIMessage(content=report),
         ])
         graph = build_agent(model, self.backend, self.checkpointer, [web_search])
-        with patch.object(web_search, "coroutine", wraps=web_search.coroutine) as search:
+        events = []
+
+        def record_progress(summary):
+            events.append("assess")
+            return original_assess(summary=summary)
+
+        original_search = web_search.coroutine
+        original_assess = think_tool.func
+
+        async def search_result(search_query):
+            events.append("search")
+            return await original_search(search_query=search_query)
+
+        with (
+            patch.object(web_search, "coroutine", side_effect=search_result) as search,
+            patch.object(think_tool, "func", side_effect=record_progress) as assess,
+        ):
             state = asyncio.run(graph.ainvoke({"messages": [{"role": "user", "content": "Research a topic"}]}, self.config))
             search.assert_awaited_once_with(search_query="test topic")
+            assess.assert_called_once_with(summary=assessment)
+        self.assertEqual(events, ["search", "assess"])
         self.assertEqual(state["messages"][-1].content, report)
         self.assertEqual(state["todos"][0]["status"], "completed")
         self.assertEqual((self.workspace / "final_report.md").read_text(), report)

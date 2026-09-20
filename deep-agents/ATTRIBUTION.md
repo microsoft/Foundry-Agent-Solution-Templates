@@ -2,7 +2,9 @@
 
 The workflow in `src/agent.py` adapts the planner, researcher subagent,
 working files and report structure from LangChain Deep Research. Prompts
-are shortened; Tavily is replaced with Foundry Toolbox managed web search.
+restore its research budgets, stopping rules, citation checks and `think_tool`;
+the tool records concise evidence/progress summaries. Tavily is replaced with
+Foundry Toolbox managed web search.
 The model, Toolbox and host use langchain-azure adapters.
 
 - [Deep Agents deep_research](https://github.com/langchain-ai/deepagents/tree/c3a041e3d8f593e4e4c9bfc273d52264ceff165b/examples/deep_research),
