@@ -64,6 +64,13 @@ Add Google to `services.tools.tools` in the active `azure.yaml`:
 The committed manifests intentionally omit this entry. All Google values must
 be present before it can deploy.
 
+> [!IMPORTANT]
+> In an existing Bicep deployment, `GOOGLE_MCP_ENABLED=false` does not delete
+> previously created Google APIM or Foundry resources because ARM deploys
+> incrementally. Remove the Toolbox entry to hide Google, then delete those
+> resources explicitly or run `azd down`. Terraform can remove its
+> state-managed Google resources on reprovision.
+
 ## 2. Provision and register the callback
 
 ```powershell
