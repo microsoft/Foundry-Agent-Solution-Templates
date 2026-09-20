@@ -38,13 +38,19 @@ workflow using Foundry managed web search, plus skill-guided dataset analysis.
   overwriting existing user content. Return the report inline.
 - Keep native `execute` approval enabled, including for subagents. Never
   inherit the full process environment into the shell. LocalShellBackend is
-  not a security sandbox; do not claim shell confinement or readonly inputs.
+  not a security sandbox; do not claim shell confinement or OS read-only inputs.
+- Route file operations through the non-executing CompositeBackend root route.
+  Keep ordered write permissions: allow `/work/**`, then deny `/**`. Subagents
+  inherit them. Store scripts, reports and context-offload artifacts in `/work/`.
+  Do not bypass this with direct writes or imply it constrains approved shell code.
 - Keep session files separate from conversation checkpoints and long-term
   memory. Use the native Foundry checkpoint saver with user isolation.
 - Preserve native summarization and output offloading. Do not add a custom
   approval server or silently bypass approvals to work around client limitations.
 - Keep credentials, local Azure settings, resource identifiers and generated
   output out of tracked files. Keep content recording disabled by default.
+- Let the hosting SDK configure telemetry; do not add a second global provider
+  or duplicate automatic instrumentation in the graph factory.
 - Preserve upstream attribution and license notices for adapted material.
 
 ## Development workflow

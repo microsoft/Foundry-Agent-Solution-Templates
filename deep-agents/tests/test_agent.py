@@ -95,14 +95,14 @@ class WorkflowTest(unittest.TestCase):
         assessment = "The returned source covers the question; no gaps remain. Stop searching."
         model = ScriptedModel(responses=[
             call("write_todos", {"todos": [{"content": "Research and report", "status": "in_progress"}]}),
-            call("write_file", {"file_path": "/research_request.md", "content": "Research a topic"}),
+            call("write_file", {"file_path": "/work/research_request.md", "content": "Research a topic"}),
             call("task", {"subagent_type": "research-agent", "description": "Research a topic"}),
             call("web_search", {"search_query": "test topic"}),
             call("think_tool", {"summary": assessment}),
             AIMessage(content=report),
-            call("write_file", {"file_path": "/final_report.md", "content": report}),
-            call("read_file", {"file_path": "/final_report.md"}),
-            call("read_file", {"file_path": "/research_request.md"}),
+            call("write_file", {"file_path": "/work/final_report.md", "content": report}),
+            call("read_file", {"file_path": "/work/final_report.md"}),
+            call("read_file", {"file_path": "/work/research_request.md"}),
             call("write_todos", {"todos": [{"content": "Research and report", "status": "completed"}]}),
             AIMessage(content=report),
         ])
@@ -130,12 +130,12 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(events, ["search", "assess"])
         self.assertEqual(state["messages"][-1].content, report)
         self.assertEqual(state["todos"][0]["status"], "completed")
-        self.assertEqual((self.workspace / "final_report.md").read_text(), report)
+        self.assertEqual((self.workspace / "work/final_report.md").read_text(), report)
         results = [m for m in state["messages"] if isinstance(m, ToolMessage)]
         self.assertTrue(any(m.name == "task" and "https://example.com/research" in str(m.content) for m in results))
         self.assertFalse(any(m.status == "error" for m in results))
         # Same session files survive a rebuilt graph, with isolated conversation state.
-        model.responses = [call("read_file", {"file_path": "/final_report.md"}), AIMessage(content=report)]
+        model.responses = [call("read_file", {"file_path": "/work/final_report.md"}), AIMessage(content=report)]
         model.i = 0
         rebuilt = build_agent(model, self.backend, self.checkpointer, [web_search])
         continued = rebuilt.invoke({"messages": [{"role": "user", "content": "Read my report"}]}, self.config)
@@ -197,6 +197,53 @@ class WorkflowTest(unittest.TestCase):
                     resumed.invoke(Command(resume={"decisions": [{"type": decision}]}), self.config)
                     self.assertEqual(target.exists(), decision == "approve")
 
+    def test_readonly_inputs_for_coordinator_and_researcher(self):
+        protected = ["/skills/dataset-analysis/SKILL.md", "/data/quarterly_sales.json"]
+        originals = {path: (self.workspace / path.lstrip("/")).read_bytes() for path in protected}
+        attempts = [
+            ("write_file", {"file_path": path, "content": "modified"})
+            for path in protected + ["/skills/new.md", "/data/new.json", "/new.txt", "/other/new.txt", "/work-sibling/new.txt"]
+        ] + [
+            ("edit_file", {"file_path": path, "old_string": "Cedar", "new_string": "changed"})
+            for path in protected
+        ] + [("delete", {"file_path": path}) for path in protected + ["/skills", "/data", "/"]]
+        for delegated in (False, True):
+            for name, args in attempts:
+                with self.subTest(delegated=delegated, tool=name, path=args["file_path"]):
+                    responses = [call(name, args), AIMessage(content="Denied")]
+                    if delegated:
+                        responses = [call("task", {"subagent_type": "research-agent", "description": "Check input permissions"})] + responses + [AIMessage(content="Done")]
+                    seen = []
+                    model = PermissiveModel(responses=responses)
+                    generate = model._generate
+
+                    def capture(messages, *args, **kwargs):
+                        seen.extend(m for m in messages if isinstance(m, ToolMessage))
+                        return generate(messages, *args, **kwargs)
+
+                    graph = build_agent(model, self.backend, InMemorySaver(), [web_search])
+                    with patch.object(model, "_generate", side_effect=capture):
+                        graph.invoke({"messages": [{"role": "user", "content": "Check permissions"}]}, self.config)
+                    self.assertTrue(any(m.name == name and "denied" in str(m.content).lower() for m in seen))
+                    for path, content in originals.items():
+                        self.assertEqual((self.workspace / path.lstrip("/")).read_bytes(), content)
+        self.assertFalse((self.workspace / "skills/new.md").exists())
+        self.assertFalse((self.workspace / "data/new.json").exists())
+        for delegated in (False, True):
+            responses = [
+                call("write_file", {"file_path": "/work/allowed.txt", "content": "before"}),
+                call("edit_file", {"file_path": "/work/allowed.txt", "old_string": "before", "new_string": "after"}),
+                call("read_file", {"file_path": "/work/allowed.txt"}),
+                call("delete", {"file_path": "/work/allowed.txt"}),
+                AIMessage(content="Allowed"),
+            ]
+            if delegated:
+                responses = [call("task", {"subagent_type": "research-agent", "description": "Check writable path"})] + responses + [AIMessage(content="Done")]
+            build_agent(ScriptedModel(responses=responses), self.backend, InMemorySaver(), [web_search]).invoke(
+                {"messages": [{"role": "user", "content": "Check writable path"}]}, self.config,
+            )
+            self.assertFalse((self.workspace / "work/allowed.txt").exists())
+
     def test_dataset_skill(self):
         script = ("import json\nfrom collections import defaultdict\n"
                   "totals = defaultdict(lambda: [0, 0])\n"
@@ -208,8 +255,8 @@ class WorkflowTest(unittest.TestCase):
         model = ScriptedModel(responses=[
             call("read_file", {"file_path": "/skills/dataset-analysis/SKILL.md"}),
             call("read_file", {"file_path": "/data/quarterly_sales.json"}),
-            call("write_file", {"file_path": "/analyze_sales.py", "content": script}),
-            call("execute", {"command": f'"{sys.executable}" analyze_sales.py'}),
+            call("write_file", {"file_path": "/work/analyze_sales.py", "content": script}),
+            call("execute", {"command": f'"{sys.executable}" work/analyze_sales.py'}),
             AIMessage(content="Done"),
         ])
         graph = build_agent(model, self.backend, self.checkpointer, [web_search])
@@ -235,7 +282,7 @@ class WorkflowTest(unittest.TestCase):
         state = graph.invoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config)
         output = next(m for m in state["messages"] if isinstance(m, ToolMessage))
         self.assertIn("large_tool_results", output.content)
-        self.assertTrue(any(p.stat().st_size > 80000 for p in self.workspace.rglob('*') if p.is_file() and "large_tool_results" in p.parts))
+        self.assertTrue(any(p.stat().st_size > 80000 for p in (self.workspace / "work/large_tool_results").rglob('*') if p.is_file()))
 
     def test_summarization_keeps_retrievable_history(self):
         model = ScriptedModel(responses=[AIMessage(content="Summary of fictional discussion"), AIMessage(content="Continued")])
@@ -246,7 +293,7 @@ class WorkflowTest(unittest.TestCase):
             graph = build_agent(model, self.backend, self.checkpointer, [web_search])
         messages = [{"role": "user" if i % 2 == 0 else "assistant", "content": f"Fictional observation {i}"} for i in range(7)]
         graph.invoke({"messages": messages}, self.config)
-        archives = list(self.workspace.glob("conversation_history/*.md"))
+        archives = list(self.workspace.glob("work/conversation_history/*.md"))
         self.assertTrue(archives)
         self.assertIn("Fictional observation 0", archives[0].read_text(encoding="utf-8"))
         self.assertTrue(graph.get_state(self.config).values.get("_summarization_event"))

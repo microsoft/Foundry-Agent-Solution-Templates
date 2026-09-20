@@ -85,7 +85,14 @@ workspace as their current directory, **but can access the rest of the container
 Only basic executable-path/Windows variables are passed to the shell; credentials
 are not inherited. This does not prevent approved code from accessing host
 files, network or managed identity. Review every command and use trusted users
-and synthetic data. Skills/data are not enforced read-only.
+and synthetic data. A native `CompositeBackend` routes all file tools to a
+filesystem backend, with ordered permissions: allow writes under `/work/**`,
+then deny writes under `/**`. Both the coordinator and research subagents can
+read the workspace, but can create or modify files only under `/work/`. All
+other paths, including `/skills/`, `/data/` and new directories, are read-only
+through file tools. Reports, scripts and context-offload artifacts use `/work/`.
+These are file-tool permissions, not OS read-only mounts: approved shell code
+can still modify those files. Review script contents as well as the command.
 
 ## Run the agent
 
@@ -215,7 +222,7 @@ $result = Invoke-RestMethod -Method Post -Uri $agent.agent_endpoints.responses -
 $result.output
 ```
 
-In the same conversation, ask to read `/analysis_report.md` and explain a total.
+In the same conversation, ask to read `/work/analysis_report.md` and explain a total.
 Repeat after the session idles/resumes: both the file and conversation should
 remain available. A different conversation in that session shares files but
 not checkpointed messages; a new session should not contain the old report.
@@ -225,11 +232,11 @@ Automatic in-flight recovery additionally requires a stored background
 response (`background=true`, `store=true`); ordinary foreground requests do not
 enable that path. A persisted approval can be resumed after restarting its
 session with the structured request above. Session files can be downloaded
-with `azd ai agent files download deep-agents/analysis_report.md` using the
+with `azd ai agent files download deep-agents/work/analysis_report.md` using the
 same session ID.
 
-Deep Agents automatically offloads large tool results to `/large_tool_results/`
-and archives summarized history under `/conversation_history/`. Offline tests
+Deep Agents automatically offloads large tool results to `/work/large_tool_results/`
+and archives summarized history under `/work/conversation_history/`. Offline tests
 exercise both using synthetic output and a reduced summarization threshold.
 Production keeps the native model-aware thresholds; a short demo should not
 be expected to trigger summarization.
@@ -296,6 +303,12 @@ invocation traces. No custom exporter is configured by this template. See
 The deployment disables LangSmith tracing and message-content recording, not
 tracing itself. These settings do not disable Foundry conversation history or
 override service retention policies.
+Do not also initialize a `TracerProvider` or call `enable_auto_tracing()` in the
+graph factory: the configuration-driven runner already initializes the hosting
+SDK's telemetry. A second setup can conflict with the global provider or emit
+duplicate spans. Configure the hosting SDK's supported environment settings
+for the desired destination; standalone examples that own their exporter setup
+have a different initialization lifecycle.
 
 ## Customize
 

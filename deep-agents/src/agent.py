@@ -1,7 +1,8 @@
 """Small Deep Research adaptation; see ../ATTRIBUTION.md."""
 
 from deepagents import create_deep_agent
-from deepagents.backends import LocalShellBackend
+from deepagents.backends import CompositeBackend, FilesystemBackend, LocalShellBackend
+from deepagents.middleware import FilesystemPermission
 from langchain.agents.middleware import TodoListMiddleware
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool, tool
@@ -26,7 +27,7 @@ do not impose web research on tasks that only need the dataset-analysis skill.
 
 For research requests:
 1. Plan with write_todos, batching related work, and save the full question to
-   /research_request.md. Include synthesis and final verification in the plan.
+   /work/research_request.md. Include synthesis and final verification in the plan.
 2. Delegate evidence gathering to research-agent; do not search yourself. Use
    one researcher by default. Parallelize only independent comparison subjects
    or clearly separate aspects, giving each researcher one focused question.
@@ -35,14 +36,14 @@ For research requests:
 3. Review findings for coverage, contradictions and missing facts. Delegate a
    focused follow-up only for unresolved gaps; do not repeat completed research.
    Stop when evidence covers the request or the round budget is exhausted.
-4. Synthesize /final_report.md using only source URLs returned by researchers.
+4. Synthesize /work/final_report.md using only source URLs returned by researchers.
    Distinguish supported findings from inference and conflicting evidence.
    Give each unique URL one citation number across all researchers, reuse it
    in inline [1] citations, and finish with a Sources section of numbered titles
    and exact URLs. Never invent sources or present unsupported claims as verified.
    For comparisons, explain the options, differences and conclusion; for
    overviews, group key findings; for lists, omit unnecessary introductory text.
-5. Read both /research_request.md and /final_report.md. Verify coverage of every
+5. Read both /work/research_request.md and /work/final_report.md. Verify coverage of every
    requested aspect, support for material factual claims, consistent citations
    and explicit evidence gaps. Correct the report using available evidence,
    complete the todos and return the entire report inline, not just its path.
@@ -55,6 +56,11 @@ Shell commands require human approval. Never ask for credentials, inspect the
 host environment, access paths outside the workspace, or download packages.
 File tools use virtual absolute paths; shell commands use workspace-relative
 paths. Return results inline even when also writing a workspace artifact.
+Only /work/ is writable through file tools; all other workspace paths are
+read-only. Save scripts, reports and generated outputs under /work/; never use
+shell to bypass these restrictions. Shell starts at the workspace root: run
+python work/analyze_sales.py, read data/quarterly_sales.json and write
+work/analysis_payload.json. Do not use virtual absolute paths in shell commands.
 """
 
 RESEARCHER = """Research the assigned question using Foundry Toolbox web_search.
@@ -80,6 +86,7 @@ containing titles and exact tool-returned URLs. Assign one number per unique
 URL; the coordinator will consolidate them. Distinguish evidence from inference
 and include disagreements, limitations and unanswered questions. Never invent
 findings or citations, including when search fails.
+If saving research notes, write only under /work/; other paths are read-only.
 """
 
 
@@ -88,10 +95,21 @@ def build_agent(
     search_tools: list[BaseTool],
 ):
     """Keep the upstream planner / researcher / report flow on a supplied model."""
+    # Route all file tools through a filesystem backend; only execute uses shell.
+    (backend.cwd / "work").mkdir(exist_ok=True)
+    files = CompositeBackend(
+        default=backend,
+        routes={"/": FilesystemBackend(root_dir=backend.cwd)},
+        artifacts_root="/work",
+    )
     return create_deep_agent(
         model=model,
         system_prompt=WORKFLOW,
-        backend=backend,
+        backend=files,
+        permissions=[
+            FilesystemPermission(operations=["write"], paths=["/work/**"], mode="allow"),
+            FilesystemPermission(operations=["write"], paths=["/**"], mode="deny"),
+        ],
         checkpointer=checkpointer,
         skills=["/skills/"],
         interrupt_on={"execute": {"allowed_decisions": ["approve", "reject"]}},
