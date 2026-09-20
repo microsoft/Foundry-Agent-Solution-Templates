@@ -34,6 +34,9 @@ workflow using Foundry managed web search, plus skill-guided dataset analysis.
   hosting. Retain managed-identity authentication in the hosted runtime.
 - Keep the local `startupCommand` and hosted `codeConfiguration.entryPoint`
   on the same SDK runner, with the graph selected through `src/langgraph.json`.
+- Keep model deployment names literal: the Foundry provisioning provider does
+  not expand environment expressions in `deployments[].name`. Keep the agent's
+  default model deployment name aligned with that declaration.
 - Use the Hosted Agent session's HOME for working files and an ignored local
   workspace during development. Seed missing skill/data files without
   overwriting existing user content. Return the report inline.
