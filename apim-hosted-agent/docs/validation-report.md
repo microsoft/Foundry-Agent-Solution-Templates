@@ -5,10 +5,13 @@ Date: 2026-09-17
 ## Scope
 
 This validation covered the `apim-hosted-agent` template on the
-`codex/optional-google-mcp` branch. Google MCP remained disabled in every
-scenario.
+`codex/optional-google-mcp` branch in two phases. Google MCP remained disabled
+throughout the baseline matrix; the follow-up phase added dedicated
+Google-enabled Bicep and Terraform scenarios.
 
-Four isolated environments exercised the full matrix:
+### Baseline matrix
+
+Four isolated environments exercised the baseline matrix:
 
 | GitHub MCP | Infrastructure | Region |
 | --- | --- | --- |
@@ -17,7 +20,7 @@ Four isolated environments exercised the full matrix:
 | Enabled | Bicep | Germany West Central |
 | Enabled | Terraform | Norway East |
 
-Each environment requested:
+Each baseline environment requested:
 
 - one resource group;
 - one Microsoft Foundry account and project;

@@ -76,14 +76,23 @@ answering questions about Foundry agents, read the microsoft-foundry skill first
 Run commands from `apim-hosted-agent`:
 
 ```powershell
-azd up --no-prompt
+azd provision --no-prompt
 ```
 
-Test deployed traffic through
-`https://<apim-name>.azure-api.net/agent/responses` with a bearer token for
-`https://ai.azure.com/`. If GitHub MCP is enabled, update its OAuth App callback
-to the exported `GITHUB_OAUTH_REDIRECT_URL` before testing the tool. Follow
-`docs/google/README.md` for every manual Google MCP step.
+When GitHub or Google OAuth MCP is enabled, retrieve its exported redirect URL
+after provisioning and register it with the corresponding OAuth application
+before deploying:
+
+```powershell
+azd env get-value GITHUB_OAUTH_REDIRECT_URL
+azd env get-value GOOGLE_OAUTH_REDIRECT_URL
+azd deploy --no-prompt
+```
+
+Skip redirect values for integrations that are disabled. Test deployed traffic
+through `https://<apim-name>.azure-api.net/agent/responses` with a bearer token
+for `https://ai.azure.com/`. Follow `docs/google/README.md` for every manual
+Google MCP step.
 
 ## Microsoft Foundry Skill
 
