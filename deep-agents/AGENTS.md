@@ -1,6 +1,6 @@
 # Coding Agent Instructions
 
-This template runs a Deep Agents research and analysis workflow on Foundry.
+This Deep Agents template demonstrates sales-informed marketing planning on Foundry.
 
 ## Key files
 
@@ -18,9 +18,11 @@ This template runs a Deep Agents research and analysis workflow on Foundry.
 - Keep research assessments on the subagent. Search budgets are prompt guidance.
 - Keep model deployment names literal and aligned with the agent's default.
 - Keep local and hosted startup commands on the same configuration-driven runner.
-- Allow file-tool writes only under `/work/`; keep shell approval enabled for
+- Allow file-tool writes only under `/work/`; keep `write_file` and `execute` approval enabled for
   all agents and pass only the shell environment allowlist. File permissions
   do not sandbox approved code.
+- Keep concise stage/approval updates and separate simulated company metrics,
+  external evidence and assumptions. Do not invent marketing ROI/CAC or budgets.
 - Seed only missing skill/data files. Preserve session files and checkpoint
   user isolation. Keep credentials and deployment identifiers out of Git.
 - Keep content recording disabled and use hosting SDK telemetry initialization.

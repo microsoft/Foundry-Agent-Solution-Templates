@@ -1,9 +1,12 @@
 # Deep Agents on Microsoft Foundry
 
-A research and data-analysis agent built with LangChain/LangGraph Deep Agents.
-It delegates web research through Foundry Toolbox, assesses evidence with
-`think_tool`, and produces cited reports. A bundled skill demonstrates Python
-analysis of fictional sales data with execution approval.
+A LangChain/LangGraph Deep Agents solution template for Foundry. Its example
+workflow plans next-quarter marketing for fictional B2B software lines Cedar
+and Maple, combining sales analysis with cited external research. It demonstrates
+planning, subagents, skills, files, human approval and checkpoints together.
+
+The research patterns are inspired by the upstream Deep Research sample; this
+is a separate workflow, not an identical port. See [Attribution](ATTRIBUTION.md).
 
 ## What this template is for
 
@@ -39,8 +42,9 @@ Agent. You provide the subscription, deployment permissions and model quota.
 
 Working files live under `$HOME/deep-agents` when hosted and `.workspace`
 locally. File tools can write only to `/work/`; skills and data remain readable.
-Shell execution requires approval but is **not confined by file-tool permissions**.
-Review the command and script before approving.
+`write_file` and shell execution require approval, including in subagents.
+`edit_file` and `delete` still use path permissions without separate approval.
+Shell is **not confined by file-tool permissions**; review commands and scripts.
 
 ## Run the agent
 
@@ -74,11 +78,13 @@ name and `AZURE_AI_MODEL_DEPLOYMENT_NAME` aligned.
 ### 3. Test the agent
 
 ```powershell
-azd ai agent invoke deep-agents --new-session --new-conversation --protocol responses "Research how Microsoft Foundry hosted agents handle session storage. Use official sources and return a cited report."
+azd ai agent invoke deep-agents --new-session --new-conversation --protocol responses "Analyze our bundled Cedar and Maple sales data and recommend next quarter's marketing priorities. Research credible B2B software marketing practices, calculate growth, profit margins and revenue contribution with Python after approval, and produce one cited report separating simulated data, external evidence and assumptions. Propose small measurable experiments without inventing ROI, CAC or a budget."
 ```
 
-For skill-based analysis, ask: "Use the dataset-analysis skill to analyze the
-bundled fictional sales. Run Python after approval, then save and return a report."
+Approve file writes and the reviewed calculation command as prompted. The
+deliverable is `/work/final_report.md`, supported by `/work/analysis_report.md`.
+The sales data cannot establish marketing causation, ROI or CAC. In the same
+conversation, try: "Prioritize retention with a small team and revise the plan."
 
 See [Validation](docs/validation.md) for research checks, the REST approval
 procedure, session continuity and offline tests.

@@ -1,11 +1,12 @@
 # Attribution
 
-The workflow in `src/agent.py` adapts the planner, researcher subagent,
-working files and report structure from LangChain Deep Research. Prompts
-restore its research budgets, stopping rules, citation checks and `think_tool`;
-the tool records concise evidence/progress summaries. Tavily is replaced with
-Foundry Toolbox managed web search.
-The model, Toolbox and host use langchain-azure adapters.
+This template is inspired by LangChain's Deep Research example, particularly
+planning, research delegation, search budgets, stopping conditions, citation
+consolidation and the `think_tool` pattern. It is not an identical port: prompts
+are tailored to a fictional sales-informed marketing scenario with local skills,
+approved file writes/code execution, a session workspace and checkpoints.
+Foundry Toolbox replaces Tavily; model access and hosting use langchain-azure
+adapters. The upstream sources and notices are retained below.
 
 - [Deep Agents deep_research](https://github.com/langchain-ai/deepagents/tree/c3a041e3d8f593e4e4c9bfc273d52264ceff165b/examples/deep_research),
   commit `c3a041e3d8f593e4e4c9bfc273d52264ceff165b`.

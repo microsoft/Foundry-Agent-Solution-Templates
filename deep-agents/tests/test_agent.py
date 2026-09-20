@@ -124,6 +124,10 @@ class WorkflowTest(unittest.TestCase):
             patch.object(think_tool, "func", side_effect=record_progress) as assess,
         ):
             state = asyncio.run(graph.ainvoke({"messages": [{"role": "user", "content": "Research a topic"}]}, self.config))
+            for path in ("research_request.md", "final_report.md"):
+                self.assertFalse((self.workspace / "work" / path).exists())
+                self.assertEqual(state["__interrupt__"][0].value["action_requests"][0]["name"], "write_file")
+                state = asyncio.run(graph.ainvoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config))
             search.assert_awaited_once_with(search_query="test topic")
             assess.assert_called_once_with(summary=assessment)
         self.assertEqual(events, ["search", "assess"])
@@ -222,7 +226,10 @@ class WorkflowTest(unittest.TestCase):
 
                     graph = build_agent(model, self.backend, InMemorySaver(), [web_search])
                     with patch.object(model, "_generate", side_effect=capture):
-                        graph.invoke({"messages": [{"role": "user", "content": "Check permissions"}]}, self.config)
+                        state = graph.invoke({"messages": [{"role": "user", "content": "Check permissions"}]}, self.config)
+                        if state.get("__interrupt__"):
+                            # Approval must not bypass the separate path permission.
+                            graph.invoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config)
                     self.assertTrue(any(m.name == name and "denied" in str(m.content).lower() for m in seen))
                     for path, content in originals.items():
                         self.assertEqual((self.workspace / path.lstrip("/")).read_bytes(), content)
@@ -238,10 +245,32 @@ class WorkflowTest(unittest.TestCase):
             ]
             if delegated:
                 responses = [call("task", {"subagent_type": "research-agent", "description": "Check writable path"})] + responses + [AIMessage(content="Done")]
-            build_agent(ScriptedModel(responses=responses), self.backend, InMemorySaver(), [web_search]).invoke(
+            graph = build_agent(ScriptedModel(responses=responses), self.backend, InMemorySaver(), [web_search])
+            state = graph.invoke(
                 {"messages": [{"role": "user", "content": "Check writable path"}]}, self.config,
             )
+            self.assertTrue(state["__interrupt__"])
             self.assertFalse((self.workspace / "work/allowed.txt").exists())
+            graph.invoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config)
+            self.assertFalse((self.workspace / "work/allowed.txt").exists())
+
+    def test_write_approval_and_rejection_including_subagents(self):
+        for delegated in (False, True):
+            for decision in ("approve", "reject"):
+                with self.subTest(delegated=delegated, decision=decision):
+                    target = self.workspace / "work/write-approval.txt"
+                    target.unlink(missing_ok=True)
+                    responses = [call("write_file", {"file_path": "/work/write-approval.txt", "content": "approved"}), AIMessage(content="Done")]
+                    if delegated:
+                        responses = [call("task", {"subagent_type": "research-agent", "description": "Write a note"})] + responses + [AIMessage(content="Complete")]
+                    graph = build_agent(PermissiveModel(responses=responses), self.backend, InMemorySaver(), [web_search])
+                    pending = graph.invoke({"messages": [{"role": "user", "content": "Write a note"}]}, self.config)
+                    self.assertEqual(pending["__interrupt__"][0].value["action_requests"][0]["name"], "write_file")
+                    self.assertFalse(target.exists())
+                    graph.invoke(Command(resume={"decisions": [{"type": decision}]}), self.config)
+                    self.assertEqual(target.exists(), decision == "approve")
+                    if target.exists():
+                        self.assertEqual(target.read_text(), "approved")
 
     def test_dataset_skill(self):
         script = ("import json\nfrom collections import defaultdict\n"
@@ -263,6 +292,10 @@ class WorkflowTest(unittest.TestCase):
             {"messages": [{"role": "user", "content": "Analyze"}]}, self.config,
         )
         self.assertTrue(pending["__interrupt__"])
+        self.assertEqual(pending["__interrupt__"][0].value["action_requests"][0]["name"], "write_file")
+        self.assertFalse((self.workspace / "work/analyze_sales.py").exists())
+        pending = graph.invoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config)
+        self.assertEqual(pending["__interrupt__"][0].value["action_requests"][0]["name"], "execute")
         state = graph.invoke(Command(resume={"decisions": [{"type": "approve"}]}), self.config)
         results = [m for m in state["messages"] if isinstance(m, ToolMessage)]
         self.assertIn("Fictional dataset analysis", results[0].content)
