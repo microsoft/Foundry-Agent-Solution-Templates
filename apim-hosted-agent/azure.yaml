@@ -6,6 +6,7 @@ requiredVersions:
         azure.ai.connections: ">=1.0.0-beta.4"
         azure.ai.toolboxes: ">=1.0.0-beta.5"
 name: apim-hosted-agent
+resourceGroup: ${AZURE_RESOURCE_GROUP}
 metadata:
     template: apim-hosted-agent@v1
 hooks:
@@ -22,13 +23,13 @@ services:
                   name: gpt-5.6-luna
                   version: "2026-07-09"
               sku:
-                  capacity: 100
+                  capacity: 50
                   name: DataZoneStandard
     tools:
         host: azure.ai.toolbox
         uses:
             - project
-        description: Microsoft Learn and GitHub tools through governed APIM MCP gateways.
+        description: Microsoft Learn, GitHub, and optional Google tools through governed APIM MCP gateways.
         tools:
             - connection: github
               name: github
@@ -81,7 +82,7 @@ services:
 infra:
     layers:
         - provider: microsoft.foundry
-          path: .
+          path: infra/foundry
           name: foundry
         - provider: bicep
           path: infra

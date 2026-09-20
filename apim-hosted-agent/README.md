@@ -4,7 +4,7 @@ This sample focuses on the API gateway pattern for enterprise AI agents. It depl
 It provides:
 - **Agent protection**: Uses Azure platform DDoS protection, APIM rate limiting, and Microsoft Entra token validation.
 - **Model token metering and budget control**: Enforces per-platform-user tokens-per-minute and hourly token quotas.
-- **Tool permission policy**: Applies governed MCP policies and optional GitHub user and tool denylists.
+- **Tool permission policy**: Applies governed MCP policies and optional user and tool denylists.
 - **AI content safety**: Explicitly blocks harmful Responses model prompts and applies shared safety policies to agent and MCP boundaries.
 
 ## What this template is for
@@ -33,13 +33,15 @@ Review [Cost planning](docs/cost.md) before provisioning.
 
 The sample includes:
 
-- **APIM APIs:** a hosted-agent ingress API, a direct hosted-agent model API, and governed MCP tool APIs for Microsoft Learn and GitHub;
+- **APIM APIs:** a hosted-agent ingress API, a direct hosted-agent model API, and governed MCP tool APIs;
 - **Agent ingress policies:** apply authentication, rate limiting, and inbound and outbound Content Safety;
 - **Model gateway policies:** authenticate the hosted agent, enforce harmful-content checks and per-user token limits, and route Responses requests to Foundry with managed identity and TLS certificate chain and hostname validation;
 - **Microsoft Learn MCP policies:** provide per-caller rate limiting and inbound
   and outbound harm-category filtering;
 - **GitHub MCP policies:** validate GitHub OAuth, enforce user and tool denylists,
   rate-limit callers, and apply shared Content Safety checks.
+
+Google MCP is optional and disabled by default. See the [Google MCP guide](docs/google/README.md) to configure, enable, deploy, test, or disable it.
 
 ## Run the agent
 
@@ -56,7 +58,7 @@ You need:
 - **Foundry User** at the subscription scope, or on the new Foundry resource
   before deploying and invoking the agent;
 - Permission and available quota to deploy and use a model in Microsoft Foundry.
-  The example configuration uses `gpt-5.6-luna` version `2026-07-09` with 100
+  The example configuration uses `gpt-5.6-luna` version `2026-07-09` with 50
   Data Zone Standard capacity units.
 
 Sign in to both CLIs with the same tenant:
@@ -69,7 +71,9 @@ azd auth login
 ### 2. Create an azd environment
 
 Choose a new environment name, subscription, APIM name, and publisher details.
-Use the environment name as the resource-group name.
+Set `AZURE_RESOURCE_GROUP` to the Microsoft Foundry layer's deterministic
+`rg-<environment-name>-foundry` resource-group name before provisioning. Both
+the Foundry and APIM layers then target that group.
 
 Before running any `azd` command, select the IaC manifest. Bicep is active by
 default. For Terraform development, temporarily swap the manifests:
@@ -91,6 +95,7 @@ Rename-Item azure-bicep.yaml azure.yaml
 $environmentName = '<environment-name>'
 $subscriptionId = '<subscription-id>'
 $location = 'eastus'
+$resourceGroup = "rg-$environmentName-foundry"
 $apimName = '<globally-unique-apim-name>'
 $publisherEmail = 'you@example.com'
 $publisherName = 'Your organization'
@@ -99,7 +104,7 @@ azd env new $environmentName `
   --subscription $subscriptionId `
   --location $location
 
-azd env set AZURE_RESOURCE_GROUP $environmentName
+azd env set AZURE_RESOURCE_GROUP $resourceGroup
 azd env set APIM_NAME $apimName
 azd env set APIM_PUBLISHER_EMAIL $publisherEmail
 azd env set APIM_PUBLISHER_NAME $publisherName
@@ -120,7 +125,7 @@ azd env select $environmentName
 > then use its client ID and secret in the commands above. Step 4 replaces the
 > temporary callback with the connection's generated redirect URL.
 
-### 3. Provision and deploy
+### 3. Provision the infrastructure
 
 Choose one infrastructure entry point:
 
@@ -130,18 +135,29 @@ Choose one infrastructure entry point:
   plus an Azure CLI sign-in.
 
 ```powershell
-azd up --no-prompt
+azd provision --no-prompt
 ```
 
-The custom `up` workflow first provisions the resource group, Foundry
-account/project/model, Learn connection, RBAC, and APIM service, backends, APIs,
-policies, named values, and resource links. It then deploys the toolbox and
-hosted agent. When both GitHub OAuth values are configured, provisioning also
-creates the GitHub APIM resources and Foundry connection. The connections are
-declared in `infra/foundry.bicep` for Bicep and `infra-terraform/foundry.tf` for
+Provisioning creates the Foundry resource group, account, project, model, Learn
+connection, RBAC, APIM service, backends, APIs, policies, named values, and
+resource links. When both GitHub OAuth values are configured, it also creates
+the GitHub APIM resources and Foundry connection. The connections are declared
+in `infra/foundry.bicep` for Bicep and `infra-terraform/foundry.tf` for
 Terraform. The postprovision hook canonicalizes resource links.
 Each IaC version keeps its policy XML locally under `infra/policies` or
 `infra-terraform/policies`.
+
+Confirm that azd retained the selected resource-group name:
+
+```powershell
+$resourceGroup = (azd env get-value AZURE_RESOURCE_GROUP).Trim()
+
+if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
+  throw "AZURE_RESOURCE_GROUP is not set."
+}
+
+$resourceGroup
+```
 
 > [!NOTE]
 > To deploy without GitHub, remove the GitHub object from
@@ -168,7 +184,19 @@ because it does not contain the OAuth `state` parameter.
 
 For deployments without GitHub, skip this step.
 
-### 5. Test the agent
+### 5. Deploy the toolbox and hosted agent
+
+After saving the GitHub callback URL, or immediately after provisioning when
+GitHub is disabled, deploy the services:
+
+```powershell
+azd deploy --no-prompt
+azd ai agent show --output json
+```
+
+The agent is ready when its deployed version reports `active` or `deployed`.
+
+### 6. Test the agent
 
 Call the governed agent through APIM:
 
@@ -198,7 +226,7 @@ OAuth token for subsequent tool calls.
 
 ## Customize limits
 
-Change per-user model limits, request-rate, GitHub governance, and Content
+Change per-user model limits, request-rate, tool governance, and Content
 Safety settings in **API Management > Named values**. Named-value changes affect
 policy execution without changing policy XML. Rate-limit and token-limit values
 are included in their counter keys, so changing a configured limit starts a
@@ -210,7 +238,8 @@ change must persist.
 
 ## Policy Defaults
 
-APIM exposes exactly 13 administrator-facing named values. Deployment wiring
+APIM exposes administrator-facing named values for limits, safety, and tool
+governance. Deployment wiring
 such as tenant ID, project managed-identity principal ID, backend ID, project
 name, and model deployment name is embedded by the selected IaC template and is not shown as
 policy configuration.
@@ -272,7 +301,7 @@ Keep `services.project.deployments` in the selected `azure.yaml` aligned with
 
 ### Provisioning fails with `InsufficientQuota`
 
-The example model configuration requests 100 `gpt-5.6-luna` Data Zone Standard
+The example model configuration requests 50 `gpt-5.6-luna` Data Zone Standard
 capacity units. The failure can come from either the Foundry account-count quota
 or the model quota. Inspect both in the selected environment region:
 

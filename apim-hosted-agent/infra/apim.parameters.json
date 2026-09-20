@@ -36,6 +36,24 @@
     },
     "githubBlockedToolNames": {
       "value": "${GITHUB_BLOCKED_TOOL_NAMES=}"
+    },
+    "googleMcpEnabled": {
+      "value": "${GOOGLE_MCP_ENABLED=false}"
+    },
+    "googleMcpEndpoint": {
+      "value": "${GOOGLE_MCP_ENDPOINT=}"
+    },
+    "googleOAuthClientId": {
+      "value": "${GOOGLE_OAUTH_CLIENT_ID=}"
+    },
+    "googleOAuthClientSecret": {
+      "value": "${GOOGLE_OAUTH_CLIENT_SECRET=}"
+    },
+    "googleBlockedEmails": {
+      "value": "${GOOGLE_BLOCKED_EMAILS=}"
+    },
+    "googleBlockedToolNames": {
+      "value": "${GOOGLE_BLOCKED_TOOL_NAMES=}"
     }
   }
 }

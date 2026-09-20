@@ -49,3 +49,15 @@ output "GITHUB_MCP_URL" {
 output "GITHUB_OAUTH_REDIRECT_URL" {
   value = local.github_enabled ? azapi_resource.github_connection[0].output.properties.redirectUrl : ""
 }
+
+output "GOOGLE_MCP_ENABLED" {
+  value = local.google_enabled
+}
+
+output "GOOGLE_MCP_URL" {
+  value = local.google_enabled ? module.google_tool[0].gateway_url : ""
+}
+
+output "GOOGLE_OAUTH_REDIRECT_URL" {
+  value = local.google_enabled ? azapi_resource.google_connection[0].output.properties.redirectUrl : ""
+}

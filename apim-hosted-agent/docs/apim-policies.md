@@ -14,11 +14,13 @@ it is deployed, and how requests flow through it.
 | `foundry-model-user-level-policy.xml` | Policy fragment | Validate the propagated user key and apply per-user token limits |
 | `foundry-tool-learn-mcp-policy.xml` | Microsoft Learn MCP API | Apply caller rate limiting and the shared tool Content Safety fragment |
 | `foundry-tool-github-mcp-policy.xml` | GitHub MCP API | Validate GitHub OAuth, enforce username and exact-tool denylists, rate-limit by GitHub user ID, and apply tool Content Safety |
+| Optional external OAuth MCP | See the optional integration guide below |
 | `foundry-tool-content-safety-policy.xml` | Policy fragment | Provide shared inbound/outbound MCP harm filtering |
 
 ## Named-value inventory
 
-APIM exposes 13 administrator-facing policy named values:
+APIM exposes 13 administrator-facing policy named values by default. Optional
+external MCP integrations can add provider-specific values.
 
 | Configuration area | Named values |
 | --- | --- |
@@ -159,8 +161,13 @@ OAuth scopes. Actual access is limited by those scopes and the permissions of
 the authenticated GitHub user. The `repo` scope includes read and write access
 to public and private repositories.
 
+### Optional external OAuth MCP
+
+The [Google MCP guide](google/README.md) contains the complete provider-specific
+policy, OAuth, Bicep/Terraform, consent, testing, and disablement instructions.
+
 ### `foundry-tool-content-safety-policy.xml`
 
-This reusable fragment is included by both MCP APIs. It applies the four harm
+This reusable fragment is included by all governed MCP APIs. It applies the four harm
 category thresholds configured by the `policy-content-safety-*-threshold` named
 values.

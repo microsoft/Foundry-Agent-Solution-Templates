@@ -93,8 +93,8 @@ context band and current meters with the
 [GPT-5.6 Luna Data Zone retail price query](https://prices.azure.com/api/retail/prices?currencyCode=USD&$filter=armRegionName%20eq%20%27eastus%27%20and%20contains(meterName,%20%275.6%20luna%27)%20and%20contains(skuName,%20%27Std%20DZ%27))
 and [Azure OpenAI pricing](https://azure.microsoft.com/pricing/details/azure-openai/).
 
-The configured 100 model capacity units allocate quota and throughput for this
-Standard deployment. They are not 100 always-on model instances and must not be
+The configured 50 model capacity units allocate quota and throughput for this
+Standard deployment. They are not 50 always-on model instances and must not be
 multiplied by 730 hours. Billing uses model token consumption. See
 [Azure OpenAI quota](https://learn.microsoft.com/azure/foundry/openai/how-to/quota).
 
