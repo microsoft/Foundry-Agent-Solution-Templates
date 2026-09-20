@@ -60,7 +60,7 @@ flowchart LR
 ```
 
 The native `microsoft.foundry` azd provider provisions the Foundry resources
-required for a project, the declared `gpt-4.1-mini` model deployment and the
+required for a project, the declared `gpt-5.6-luna` model deployment and the
 Hosted Agent. The native Toolbox service deploys `deep-agents-tools`, containing
 only managed `web_search`; the SDK loads that tool for the research subagent.
 You supply an Azure subscription, a supported region with model
@@ -131,7 +131,8 @@ the model name, version, SKU and capacity; change its deployment block before
 provisioning if your region or quota requires a different tool-capable model.
 The native provider supplies `FOUNDRY_PROJECT_ENDPOINT`. Both the declared model
 deployment name and the agent's `AZURE_AI_MODEL_DEPLOYMENT_NAME` default to
-`gpt-4.1-mini`, so a new environment needs no model-name setting. To use another
+`gpt-5.6-luna` (model version `2026-07-09`), so a new environment needs no
+model-name setting. To use another
 deployment name, set `AZURE_AI_MODEL_DEPLOYMENT_NAME` in the azd environment;
 when provisioning a different model, also update the model/version/SKU fields.
 `TOOLBOX_NAME` selects the declared `deep-agents-tools` toolbox. For an existing

@@ -11,11 +11,11 @@ services:
   ai-project:
     host: azure.ai.project
     deployments:
-      - name: ${AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-4.1-mini}
+      - name: ${AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-5.6-luna}
         model:
           format: OpenAI
-          name: gpt-4.1-mini
-          version: '2025-04-14'
+          name: gpt-5.6-luna
+          version: '2026-07-09'
         sku:
           name: GlobalStandard
           capacity: 10
@@ -43,7 +43,7 @@ services:
       - name: TOOLBOX_NAME
         value: deep-agents-tools
       - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
-        value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-4.1-mini}
+        value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-5.6-luna}
       - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT
         value: 'false'
       - name: AZURE_TRACING_GEN_AI_CONTENT_RECORDING_ENABLED
