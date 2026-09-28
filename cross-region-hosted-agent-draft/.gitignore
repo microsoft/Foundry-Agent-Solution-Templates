@@ -1,0 +1,6 @@
+*.parameters.local.json
+infra/*.json
+!infra/example.parameters.json
+infra/modules/*.json
+*.zip
+/VALIDATION.md

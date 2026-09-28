@@ -1,0 +1,30 @@
+{
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "knowledgeVnetName": {
+      "value": "<east-asia-knowledge-vnet>"
+    },
+    "blobDnsZoneResourceGroup": {
+      "value": "<private-dns-resource-group>"
+    },
+    "agentPrincipalId": {
+      "value": "<actual-agent-instance-object-id>"
+    },
+    "storageResourceGroup": {
+      "value": "<east-asia-storage-resource-group>"
+    },
+    "agentVnetName": {
+      "value": "<southeast-asia-agent-vnet>"
+    },
+    "storageAccountName": {
+      "value": "<storage-account-name>"
+    },
+    "blobContainerName": {
+      "value": "<container-name>"
+    },
+    "knowledgeResourceGroup": {
+      "value": "<east-asia-knowledge-resource-group>"
+    }
+  },
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
+}
