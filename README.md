@@ -12,7 +12,7 @@ agents. Each template is self-contained in its own subfolder.
 | 3. [Enterprise Knowledge Agent](enterprise-knowledge-agent/) | Demonstrates grounding with custom data from Fabric, databases, org APIs, and Microsoft IQs, and shows a typical RAG setup with a hosted agent, including connection and authentication best practices. |
 | 4. Multi-agent *(coming soon)* | Demonstrates multi-agent patterns with agent-to-agent (A2A) orchestration, agent registry and endpoints, A2A/Model Context Protocol (MCP) routing, shared observability, cross-agent authentication, and governance policies. |
 | 5. Regulated/Sovereign Agent *(coming soon)* | Demonstrates an agent setup for strict data residency and private deployments in regulated environments. |
-| 6. LangChain/LangGraph based hosted agent *(coming soon)* | Demonstrates a hosted agent built with LangChain/LangGraph stack, with compatible observabilities, and different options to host on Foundry. |
+| 6. LangChain/LangGraph-based hosted agent *(coming soon)* | Demonstrates a hosted agent built with LangChain/LangGraph stack, with compatible observabilities, and different options to host on Foundry. |
 | 7. Auditable self-managed agent with observability *(coming soon)* | Demonstrates integrating a hosted agent with self-managed observability for operations and FinOps, including exporting telemetry to popular third-party analytics stores. |
 | 8. Self-improving Agent *(coming soon)* | Demonstrates a secure flow using real-world data to perform RL/Fine-tuning on deployed agents and models in production. |
 | 9. Dev/test/prod environments with CI/CD *(coming soon)* | Demonstrates isolated dev/test/prod environments for Foundry Agents and how to link them via CI/CD. |
