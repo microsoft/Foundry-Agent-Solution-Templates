@@ -1,0 +1,8 @@
+[
+  {"claim_id": "CLM-1001", "policy": {"policy_id": "POL-2001", "holder": "A. Rivera"}, "claim_type": "motor", "amount": 7314.04, "days_open": 27, "status": "open", "flagged": false},
+  {"claim_id": "CLM-1002", "policy": {"policy_id": "POL-2002", "holder": "B. Chen"}, "claim_type": "property", "amount": 18120.24, "days_open": 55, "status": "open", "flagged": true, "flag_reason": "Repair invoice exceeds the assessor estimate by 61%."},
+  {"claim_id": "CLM-1003", "policy": {"policy_id": "POL-2003", "holder": "C. Okafor"}, "claim_type": "health", "amount": 1779.40, "days_open": 26, "status": "settled", "flagged": false},
+  {"claim_id": "CLM-1004", "policy": {"policy_id": "POL-2004", "holder": "D. Novak"}, "claim_type": "motor", "amount": 22450.00, "days_open": 3, "status": "open", "flagged": true, "flag_reason": "Third claim on this policy in 12 months."},
+  {"claim_id": "CLM-1005", "policy": {"policy_id": "POL-2005", "holder": "E. Haddad"}, "claim_type": "property", "amount": 4380.75, "days_open": 41, "status": "open", "flagged": false},
+  {"claim_id": "CLM-1006", "policy": {"policy_id": "POL-2006", "holder": "F. Silva"}, "claim_type": "travel", "amount": 960.00, "days_open": 12, "status": "open", "flagged": true, "flag_reason": "Receipt dates fall outside the insured trip."}
+]
