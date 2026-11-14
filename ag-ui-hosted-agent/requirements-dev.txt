@@ -1,0 +1,6 @@
+-r src/agent/requirements.txt
+-r src/gateway/requirements.txt
+httpx
+pytest
+pyyaml
+ruff
