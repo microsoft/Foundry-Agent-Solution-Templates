@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": { "value": "${AZURE_ENV_NAME}" },
+    "location": { "value": "${AZURE_LOCATION}" },
+    "resourceGroupName": { "value": "${AZURE_FOUNDRY_RESOURCE_GROUP}" },
+    "foundryAccountName": { "value": "${AZURE_AI_ACCOUNT_NAME}" },
+    "foundryProjectName": { "value": "${AZURE_AI_PROJECT_NAME}" },
+    "foundryProjectEndpoint": { "value": "${FOUNDRY_PROJECT_ENDPOINT}" },
+    "webExists": { "value": "${SERVICE_WEB_RESOURCE_EXISTS=false}" },
+    "gatewayExists": { "value": "${SERVICE_GATEWAY_RESOURCE_EXISTS=false}" }
+  }
+}
